@@ -1,0 +1,9 @@
+12/11/2025  08:37:36.119  --- CFA WhiteList ---
+12/11/2025  08:37:36.170  CFA_Exc_Add: D:\Pruebas\ProgramData\HardDiskSentinel_All_Eng\HDSentinel.exe
+12/11/2025  08:37:42.406  CFA_Exc_Res: 
+12/11/2025  08:37:42.432  CFA_Exc_Add: D:\Pruebas\ProgramData\HardDiskSentinel_All_Eng\HDSAction.exe
+12/11/2025  08:37:45.840  CFA_Exc_Res: 
+12/11/2025  08:37:45.914  CFA_Exc_Add: D:\Pruebas\ProgramData\HardDiskSentinel_All_Eng\Storagetest.dll
+12/11/2025  08:37:50.027  CFA_Exc_Res: 
+12/11/2025  08:37:53.108  --- Restart ---
+12/11/2025  08:38:00.486  --- Done ---
