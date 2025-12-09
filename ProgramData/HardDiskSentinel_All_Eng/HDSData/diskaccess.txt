@@ -1,0 +1,5 @@
+12/11/2025  08:36:38.161  DiskAccessDenied
+12/11/2025  08:36:38.190  CFA Active
+12/11/2025  08:36:38.339  Not whitelisted
+12/11/2025  08:37:33.909  Adding HDSRestart CFAWhiteList HDS
+12/11/2025  08:37:35.666  Step2

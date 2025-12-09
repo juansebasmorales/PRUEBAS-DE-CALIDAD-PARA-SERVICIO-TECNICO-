@@ -1,0 +1,261 @@
+
+
+
+  -- Información del disco físico - Disco: #2: CT500BX500SSD1 --
+
+    Sumario del disco duro
+   ------------------------
+    Número Del Disco Duro  . . . . . . . . . . . . . : 2
+    Interfaz . . . . . . . . . . . . . . . . . . . . : SAT Standard USB/ATA
+    Información Del Vendedor . . . . . . . . . . . . : VID: 1F75, PID: 0621
+    Versión  . . . . . . . . . . . . . . . . . . . . : USB 3.0
+    Controlador De Disco . . . . . . . . . . . . . . : Intel(R) USB 3.10 eXtensible Host Controller - 1.20 (Microsoft) (USB 3.0) [VEN: 8086, DEV: A0ED] Versión: 10.0.22621.5415, 5-29-2025
+    Modelo De Identificación Del Disco Duro  . . . . : CT500BX500SSD1
+    Revisión Del Firmware  . . . . . . . . . . . . . : M6CR061
+    Nº De Serie Del Disco Duro . . . . . . . . . . . : 2234E658A53A
+    Controlador SSD  . . . . . . . . . . . . . . . . : Silicon Motion SM2258XT
+    Tamaño Total Del Disco Duro  . . . . . . . . . . : 476937 MB
+    Estado De Energía  . . . . . . . . . . . . . . . : Activo
+    USB Device Name  . . . . . . . . . . . . . . . . : Ext. HDD
+    Tipo De Dispositivo  . . . . . . . . . . . . . . : Desmontable, surprise remove possible
+    Temperatura Actual . . . . . . . . . . . . . . . : 25 °C
+    Temperatura Máxima (Alguna Vez Medida) . . . . . : 29 °C, 8/19/2025 4:29:28 PM
+    Temperatura Mínima (Alguna Vez Medida) . . . . . : 25 °C, 10/11/2025 10:33:12 AM
+    Temperatura Máxima (Durante Toda La Vida útil) . : 55 °C
+    Tiempo Encendido . . . . . . . . . . . . . . . . : 236 días, 13 horas
+    Tiempo De Vida Restante Estimado . . . . . . . . : más de 1000 días
+    Escrituras Desde Siempre . . . . . . . . . . . . : 17.88 TB
+    Estado . . . . . . . . . . . . . . . . . . . . . : ################---- 83 % (Bueno)
+    Rendimiento  . . . . . . . . . . . . . . . . . . : ###################- 99 % (Excelente)
+
+    Se produjeron problemas entre la comunicación del disco y el anfitrión 16100 veces.
+    En caso de un fallo repentino del sistema, reinicio, archivos/carpetas inaccesibles, pantalla azul, se recomienda verificar los datos y los cables de alimentación, las conexiones y, si es posible, probar diferentes cables para evitar más problemas.
+    Más información: https://www.hdsentinel.com/hard_disk_case_communication_error.php
+    La función TRIM del SSD es compatible y está habilitada para un rendimiento óptimo.
+    La salud se determina por atributos específicos S.M.A.R.T. del SSD: #202 Percentage Of The Rated Lifetime Used
+      Se recomienda controlar continuamente el estado del disco duro.
+
+    Información ATA
+   -----------------
+    Cilindros Del Disco Duro . . . . . . . . . . . . : 969021
+    Cabezales Del Disco Duro . . . . . . . . . . . . : 16
+    Sectores Del Disco Duro  . . . . . . . . . . . . : 63
+    Revisión ATA . . . . . . . . . . . . . . . . . . : ACS-3 Revision 4
+    Versión De Transferencia . . . . . . . . . . . . : SATA Rev 3.3
+    Sectores Totales . . . . . . . . . . . . . . . . : 976773168
+    Bytes Por Sector . . . . . . . . . . . . . . . . : 512
+    Sectores Múltiples . . . . . . . . . . . . . . . : 1
+    Bytes De Corrección De Errores . . . . . . . . . : 0
+    Capacidad Sin Formatear  . . . . . . . . . . . . : 476940 MB
+    Modo PIO Máximo  . . . . . . . . . . . . . . . . : 4
+    Modo DMA Máximo De Múltiples Palabras  . . . . . : 2
+    Tasa De Transferencia Más Alta Posible . . . . . : Velocidad de señalización S-ATA Gen3 (6 Gps)
+    Tasa De Transferencia Negociada  . . . . . . . . : Velocidad de señalización S-ATA II (3 Gps)
+    Tiempo Mínimo De Transferencia DMA De Múltiple.. : 120 ns
+    Tiempo Recomendado De Transferencia DMA De Múl.. : 120 ns
+    Tiempo Mínimo De Transferencia De PIO Sin IORDY  : 120 ns
+    Tiempo Mínimo De Transferencia De PIO Con IORDY  : 120 ns
+    Bytes De Control ATA . . . . . . . . . . . . . . : Válido
+    Valor De Suma De Control ATA . . . . . . . . . . : Válido
+
+    Configuración de gestión acústica
+   -----------------------------------
+    Gestión Acústica . . . . . . . . . . . . . . . . : No soportado
+    Gestión Acústica . . . . . . . . . . . . . . . . : Deshabilitado
+    Nivel Acústico Actual  . . . . . . . . . . . . . : Predeterminado (00h)
+    Nivel Acústico Recomendado . . . . . . . . . . . : Predeterminado (00h)
+
+    Propiedades ATA
+   -----------------
+    Read Ahead Buffer  . . . . . . . . . . . . . . . : Soportado, Habilitado
+    DMA  . . . . . . . . . . . . . . . . . . . . . . : Soportado
+    Ultra DMA  . . . . . . . . . . . . . . . . . . . : Soportado
+    S.M.A.R.T. . . . . . . . . . . . . . . . . . . . : Soportado
+    Administración De Energía  . . . . . . . . . . . : Soportado
+    Caché De Escritura . . . . . . . . . . . . . . . : Soportado
+    ÁRea Protegida Del Anfitrión . . . . . . . . . . : No soportado
+    Extensiones De Seguridad HPA . . . . . . . . . . : No soportado
+    Administración Avanzada De Energía . . . . . . . : No soportado
+    Administración De Energía Extendida  . . . . . . : No soportado
+    Encendido En Modo De Espera  . . . . . . . . . . : No soportado
+    Direccionamiento LBA De 48 Bits  . . . . . . . . : Soportado
+    Configuración De Superposición Del Dispositivo . : No soportado
+    Soporte IORDY  . . . . . . . . . . . . . . . . . : Soportado
+    Cola De Lectura/Escritura DMA  . . . . . . . . . : No soportado
+    Comando NOP  . . . . . . . . . . . . . . . . . . : Soportado
+    Cálculo De Confianza . . . . . . . . . . . . . . : No soportado
+    ID Mundial De 64 Bits  . . . . . . . . . . . . . : 500A0751E658A53A
+    Transmisión  . . . . . . . . . . . . . . . . . . : No soportado
+    Tarjeta De Entrada/salida De Medios  . . . . . . : No soportado
+    Registro General De Eventos  . . . . . . . . . . : Soportado
+    Registro De Errores  . . . . . . . . . . . . . . : No soportado
+    Conjunto De Características CFA  . . . . . . . . : No soportado
+    Dispositivo Rápido . . . . . . . . . . . . . . . : No soportado
+    Sectores Físicos Largos (1)  . . . . . . . . . . : No soportado
+    Sectores Lógicos Largos  . . . . . . . . . . . . : No soportado
+    Escribir-Leer-Verificar  . . . . . . . . . . . . : No soportado
+    Características De Caché NV  . . . . . . . . . . : No soportado
+    Modo De Energía De Caché NV  . . . . . . . . . . : No soportado
+    Tamaño De Caché NV . . . . . . . . . . . . . . . : No soportado
+    Control De Choque  . . . . . . . . . . . . . . . : No soportado
+    Sensibilidad De Control De Choque  . . . . . . . : No soportado
+    Interrupción De Servicio . . . . . . . . . . . . : No soportado
+    Comando MODO DE ESPERA INMEDIATO Con La Caract.. : No soportado
+    Capacidades Por Zonas  . . . . . . . . . . . . . : No soportado
+    Transporte De Comandos SCT . . . . . . . . . . . : No soportado
+    Control De Recuperación De Errores De La SCT . . : No soportado
+    Velocidad Nominal De Rotación De Medios  . . . . : Medios no giratorios (SSD)
+    Factor De Forma Nominal  . . . . . . . . . . . . : 2.5 inch
+
+    Características SSD
+   ---------------------
+    Gestión De Conjunto De Datos . . . . . . . . . . : Soportado
+    Comando TRIM . . . . . . . . . . . . . . . . . . : Soportado
+    Lectura Determinista Después De TRIM . . . . . . : No soportado
+    Leer Ceros Después De TRIM . . . . . . . . . . . : No soportado
+    Función TRIM Del Sistema Operativo . . . . . . . : Soportado, Habilitado
+
+    Detalles S.M.A.R.T.
+   ---------------------
+    Recopilación De Datos Fuera De Línea . . . . . . : Nunca iniciado
+    Estado De Ejecución De Auto-prueba . . . . . . . : Completado con éxito
+    Tiempo Total Para Completar La Recopilación De.. : 120 segundos
+    Ejecutar Inmediatamente Fuera De Línea . . . . . : Soportado
+    Cancelar/reiniciar Fuera De Línea Por El Anfit.. : No soportado
+    Lectura De Escaneo Fuera De Línea  . . . . . . . : No soportado
+    Auto-prueba Corta  . . . . . . . . . . . . . . . : Soportado
+    Auto-prueba Extendida  . . . . . . . . . . . . . : Soportado
+    Auto-prueba De Transferencia . . . . . . . . . . : No soportado
+    Auto-prueba Selectiva  . . . . . . . . . . . . . : No soportado
+    Guardar Datos Antes/después Del Modo De Ahorro.. : No soportado
+    Habilitar/Deshabilitar Atributo Guardado Autom.. : Soportado
+    Capacidad Del Registro De Errores  . . . . . . . : Soportado
+    Tiempo Estimado De Auto-prueba Corta . . . . . . : 2 minutos
+    Tiempo Estimado De Auto-prueba Extendida . . . . : 10 minutos
+    ÚLtimo Resultado De La Auto-prueba Corta . . . . : Nunca iniciado
+    ÚLtima Fecha De La Auto-prueba Corta . . . . . . : Nunca iniciado
+    ÚLtimo Resultado De La Auto-prueba Extendida . . : Nunca iniciado
+    ÚLtima Fecha De Auto-prueba Extendida  . . . . . : Nunca iniciado
+
+    Modo de seguridad
+   -------------------
+    Modo De Seguridad  . . . . . . . . . . . . . . . : Soportado
+    Borrado De Seguridad . . . . . . . . . . . . . . : Soportado
+    Tiempo De Borrado De Seguridad . . . . . . . . . : 6 minutos
+    Función De Borrado De Seguridad Mejorada . . . . : Soportado
+    Tiempo De Borrado De Seguridad Mejorada  . . . . : 6 minutos
+    Seguridad Habilitada . . . . . . . . . . . . . . : No
+    Seguridad Bloqueada  . . . . . . . . . . . . . . : No
+    Seguridad Congelada  . . . . . . . . . . . . . . : No
+    Contador De Seguridad Caducado . . . . . . . . . : No
+    Nivel De Seguridad . . . . . . . . . . . . . . . : Alta
+    Master Password ID . . . . . . . . . . . . . . . : 65534 (Predeterminado)
+    El Dispositivo Cifra Todos Los Datos Del Usuar.. : No
+    Desinfectar  . . . . . . . . . . . . . . . . . . : Soportado
+    Sobrescribir . . . . . . . . . . . . . . . . . . : No soportado
+    Crypto Interferencia . . . . . . . . . . . . . . : No soportado
+    Borrar Bloque  . . . . . . . . . . . . . . . . . : Soportado
+    Limpiar El Bloqueo De Anti-bloqueo . . . . . . . : No soportado
+    Comandos ACS-3 Permitidos Por La Función Limpi.. : Si
+
+    Características serial ATA
+   ----------------------------
+    Cumplimiento De S-ATA  . . . . . . . . . . . . . : Si
+    Velocidad De Señalización S-ATA I (1.5 Gps)  . . : Soportado
+    Velocidad De Señalización S-ATA II (3 Gps) . . . : Soportado
+    Velocidad De Señalización S-ATA Gen3 (6 Gps) . . : Soportado
+    Recepción De Solicitudes De Administración De .. : No soportado
+    Contadores De Eventos PHY  . . . . . . . . . . . : Soportado
+    Compensaciones De Búfer No Cero En La Configur.. : No soportado
+    Configurar La Activación Automática De Optimiz.. : Soportado, Deshabilitado
+    Administración De Energía De La Interfaz De In.. : Soportado, Deshabilitado
+    Entrega De Datos En Orden  . . . . . . . . . . . : No soportado
+    Notificación Asíncrona . . . . . . . . . . . . . : No soportado
+    Preservación De La Configuración Del Software  . : Soportado, Habilitado
+    Cola De Comandos Nativos . . . . . . . . . . . . : Soportado
+    Longitud De La Cola  . . . . . . . . . . . . . . : 32
+    Transmisión NCQ  . . . . . . . . . . . . . . . . : No soportado
+    Auto Detección NCQ . . . . . . . . . . . . . . . : No soportado
+    Traducciones Parciales Automáticas A Inactivas . : No soportado
+    Ayuda De Reconstrucción  . . . . . . . . . . . . : No soportado
+    Información Híbrida  . . . . . . . . . . . . . . : No soportado
+    Dispositivo Sleep (DevSleep) . . . . . . . . . . : Soportado, Deshabilitado
+    Dispositivo Sleep Para Reducción De Consumo. . . : No soportado
+
+    Información del disco
+   -----------------------
+    Información del disco
+    Factor De Forma  . . . . . . . . . . . . . . . . : 2.5"
+    Capacidad  . . . . . . . . . . . . . . . . . . . : 500 GB (500 x 1,000,000,000 bytes)
+    Interfaz De Disco  . . . . . . . . . . . . . . . : Serial-ATA/600
+    Tipo De Dispositivo  . . . . . . . . . . . . . . : Micron 3D TLC NAND
+    Anchura  . . . . . . . . . . . . . . . . . . . . : 69.8 mm (2.7 inch)
+    Profundidad  . . . . . . . . . . . . . . . . . . : 100.0 mm (3.9 inch)
+    Altura . . . . . . . . . . . . . . . . . . . . . : 9.5 mm (0.4 inch)
+
+    S.M.A.R.T.
+   ------------
+Nº   Atributo                 Límite Valor  Peor   Datos               Estado                   Etiquetas                                              
+1    Read Error Rate          0      100    100    000000000000        OK (siempre pasando)     Autoconservación, Tasa de error, Actuación, Estadíst.. 
+5    Reallocated Sectors Co.. 10     100    100    000000000000        OK                       Autoconservación, Recuento de eventos, Estadística     
+9    Power On Time Count      0      100    100    00000000162D        OK (siempre pasando)     Autoconservación, Recuento de eventos, Estadística     
+12   Power Cycle Count        0      100    100    000000000EEF        OK (siempre pasando)     Autoconservación, Recuento de eventos, Estadística     
+171  Program Fail Count       0      100    100    000000000000        OK (siempre pasando)     Autoconservación, Recuento de eventos, Estadística     
+172  Erase Fail Count         0      100    100    000000000000        OK (siempre pasando)     Autoconservación, Recuento de eventos, Estadística     
+173  Wear Leveling Count      0      83     83     00000000009C        OK (siempre pasando)     Autoconservación, Recuento de eventos, Estadística     
+174  Unexpected Power Loss .. 0      100    100    0000000004BD        OK (siempre pasando)     Autoconservación, Recuento de eventos, Estadística     
+180  Unused Reserve (Spare).. 0      100    100    000000000029        OK (siempre pasando)     Autoconservación, Recuento de eventos, Estadística, .. 
+183  SATA Interface Downshift 0      100    100    000000000010        OK (siempre pasando)     Autoconservación, Recuento de eventos, Estadística     
+184  Error Correction Count   0      100    100    000000000000        OK (siempre pasando)     Autoconservación, Recuento de eventos, Estadística     
+187  Uncorrectable Error Co.. 0      100    100    000000000000        OK (siempre pasando)     Autoconservación, Recuento de eventos, Estadística     
+194  Controlled Temperature   0      75     45     003700180019        OK (siempre pasando)     Autoconservación, Estadística                          
+196  Reallocation Event Count 0      100    100    000000000000        OK (siempre pasando)     Autoconservación, Recuento de eventos, Estadística     
+197  Current Pending Sector.. 0      100    100    000000000000        OK (siempre pasando)     Autoconservación, Recuento de eventos, Estadística     
+198  Uncorrectable Error Co.. 0      100    100    000000000000        OK (siempre pasando)     Autoconservación, Recuento de eventos                  
+199  UltraDMA CRC Error Count 0      100    100    000000003EE4        OK (siempre pasando)     Autoconservación, Recuento de eventos, Estadística     
+202  Percentage Of The Rate.. 1      83     83     000000000011        OK                       Autoconservación, Recuento de eventos                  
+206  Write Error Rate         0      100    100    000000000000        OK (siempre pasando)     Tasa de error, Actuación, Estadística                  
+210  Successful RAIN Recove.. 0      100    100    000000000000        OK (siempre pasando)     Autoconservación, Recuento de eventos, Estadística     
+246  Total Host Sector Writes 0      100    100    0008F07C93C2        OK (siempre pasando)     Autoconservación, Recuento de eventos, Estadística     
+247  Host Program Sectors C.. 0      100    100    00004783E49E        OK (siempre pasando)     Autoconservación, Recuento de eventos, Estadística     
+248  FTL Program Page Count   0      100    100    0000FA8E1A00        OK (siempre pasando)     Autoconservación, Recuento de eventos, Estadística     
+249  Vendor-specific          0      100    100    000000000000        OK (siempre pasando)     Autoconservación, Recuento de eventos, Estadística     
+251  Vendor-specific          0      100    100    0000B4DC74EC        OK (siempre pasando)     Autoconservación, Recuento de eventos, Estadística     
+252  Vendor-specific          0      100    100    000000000020        OK (siempre pasando)     Autoconservación, Recuento de eventos, Estadística     
+253  Vendor-specific          0      100    100    000000000000        OK (siempre pasando)     Autoconservación, Recuento de eventos, Estadística     
+
+    Información de tasa de transferencia
+   --------------------------------------
+    Lectura De Datos Totales . . . . . . . . . . . . : 0 MB,  6 MB desde la instalación  (8/18/2025)
+    Escritura De Datos Totales . . . . . . . . . . . : 0 MB,  1 MB desde la instalación
+    Lecturas Promedio Por Día  . . . . . . . . . . . : 0.11 MB
+    Escrituras Promedio Por Día  . . . . . . . . . . : 0.02 MB
+    Tasa De Transferencia Actual . . . . . . . . . . : 0KB/s
+    Tasa De Transferencia Máxima . . . . . . . . . . : 0KB/s
+    Tasa De Lectura Actual . . . . . . . . . . . . . : 0KB/s
+    Tasa De Escritura Actual . . . . . . . . . . . . : 0KB/s
+    Uso Del Disco Actual . . . . . . . . . . . . . . : 0 %
+
+
+
+  -- Información de gestión del sistema --
+
+
+    Placa base Información
+   ------------------------
+    Fabricante . . . . . . . . . : Dell Inc.
+    Producto . . . . . . . . . . : 0XMF7W   A00
+    Número De Serie  . . . . . . : /DZ576R3/CNCMC0027D0D26/
+    BIOS . . . . . . . . . . . . : Dell Inc. ver. 1.40.0 [08/09/2025]
+    Módulo De Memoria 1  . . . . : 8192 MB [3200 MHz]
+    Módulo De Memoria 2  . . . . : -
+
+    Información del sistema
+   -------------------------
+    Fabricante . . . . . . . . . : Dell Inc.
+    Producto . . . . . . . . . . : Inspiron 15 3511   
+    Número De Serie  . . . . . . : DZ576R3
+    UUID . . . . . . . . . . . . : 44454C4C-5A00-1035-8037-C4C04F365233
+    Chasis . . . . . . . . . . . : Dell Inc.
+    Chasis Número De Serie . . . : DZ576R3
+

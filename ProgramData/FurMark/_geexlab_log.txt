@@ -1,0 +1,82 @@
+10:07:00:309(0000001)	[info ]	GeeXLab Player v0.66.2.0 (Oct 26 2025@07:43:16)
+10:07:00:309(0000002)	[info ]	Scriptable Proto-Engine (Lua, Python, GLSL, OpenGL, Vulkan)
+10:07:00:309(0000003)	[info ]	(C)2009-2025 Geeks3D
+10:07:00:309(0000004)	[info ]	Homepage: https://geeks3d.com/geexlab/
+10:07:00:309(0000005)	[info ]	Discord server: https://www.geeks3d.com/discord/
+10:07:00:310(0000006)	[info ]	GeeXLab Player is starting up...
+10:07:00:329(0000007)	[info ]	[stb] STB image loader. Supported formats: *.JPEG, *.PNG, *.TGA, *.BMP, *.PSD, *.GIF, *.HDR, *.PIC
+10:07:00:329(0000008)	[info ]	[tinyexr] EXR image loader.
+10:07:00:331(0000009)	[info ]	[lib3ds] Lib3ds loader (core plugin).
+10:07:00:334(0000010)	[info ]	[ObjLoaderV1] OBJ 3D loader (core plugin).
+10:07:00:334(0000011)	[info ]	[ObjLoaderV2] OBJ loader based on Tiny OBJ Loader (core plugin).
+10:07:00:334(0000012)	[info ]	[STL] STL (StereoLithography) 3D loader (core plugin).
+10:07:00:334(0000013)	[info ]	[glTF] glTF 3D loader (core plugin).
+10:07:00:336(0000014)	[info ]	[SQLite3] SQLite3 version 3.50.4
+10:07:00:336(0000015)	[info ]	GraphX Core 0.60.1.0 (codename: Dirac) initialization ok.
+10:07:00:338(0000016)	[info ]	GeeXLab home directory: D:\Pruebas\ProgramData\FurMark\
+10:07:00:339(0000017)	[info ]	Windows version: Windows 10 build 19045
+10:07:00:339(0000018)	[info ]	SW platform type: Windows 64-bit
+10:07:00:441(0000019)	[info ]	Plugins search path: D:\Pruebas\ProgramData\FurMark\plugins/;D:\Pruebas\ProgramData\FurMark\plugins/physx5/;D:\Pruebas\ProgramData\FurMark\plugins/physx4/;D:\Pruebas\ProgramData\FurMark\plugins/physx3/;D:\Pruebas\ProgramData\FurMark\plugins/ffmpeg/;D:\Pruebas\ProgramData\FurMark\plugins/assimp/;D:\Pruebas\ProgramData\FurMark\plugins/imagemagick/;D:\Pruebas\ProgramData\FurMark\plugins/fmod/;D:\Pruebas\ProgramData\FurMark\plugins/python/;D:\Pruebas\ProgramData\FurMark\plugins/flex/;D:\Pruebas\ProgramData\FurMark\plugins/freeimage/;D:\Pruebas\ProgramData\FurMark\plugins/openvr/;D:\Pruebas\ProgramData\FurMark\plugins/leap/;D:\Pruebas\ProgramData\FurMark\plugins/anttweakbar/;
+10:07:00:443(0000020)	[info ]	Current user: PC
+10:07:00:443(0000021)	[info ]	Python 3.7 home: [C:/Users/PC/AppData/Local/Programs/Python/Python37/]
+10:07:00:445(0000022)	[info ]	Python 3.8 home: [C:/Users/PC/AppData/Local/Programs/Python/Python38/]
+10:07:00:445(0000023)	[info ]	Python 3.9 home: [C:/Users/PC/AppData/Local/Programs/Python/Python39/]
+10:07:00:445(0000024)	[info ]	Python 3.10 home: [C:/Users/PC/AppData/Local/Programs/Python/Python310/]
+10:07:00:445(0000025)	[info ]	Python 3.11 home: [C:/Users/PC/AppData/Local/Programs/Python/Python311/]
+10:07:00:445(0000026)	[info ]	Python 3.12 home: [C:/Users/PC/AppData/Local/Programs/Python/Python312/]
+10:07:00:445(0000027)	[info ]	Python 3.13 home: [C:/Users/PC/AppData/Local/Programs/Python/Python313/]
+10:07:00:445(0000028)	[info ]	Python 3.14 home: [C:/Users/PC/AppData/Local/Programs/Python/Python314/]
+10:07:00:445(0000029)	[info ]	App directory: D:\Pruebas\ProgramData\FurMark\
+10:07:00:445(0000030)	[info ]	Scripting libs directory: D:\Pruebas\ProgramData\FurMark\libs\
+10:07:00:607(0000031)	[info ]	[GpuMonitor] Operating system detected: Windows 10 build 19045
+10:07:00:620(0000032)	[info ]	[GpuMonitor] Num GPUs detected: 1
+10:07:00:620(0000033)	[info ]	[GpuMonitor] > GPU0
+10:07:00:620(0000034)	[info ]	[GpuMonitor]   - name: Intel(R) HD Graphics 4000
+10:07:00:620(0000035)	[info ]	[GpuMonitor]   - PCI codes: 0x8086-0x0166
+10:07:00:620(0000036)	[info ]	[GpuMonitor]   - VBIOS: Intel Video BIOS
+10:07:00:620(0000037)	[info ]	[GpuMonitor]   - driver: Intel 10.18.10.5161 (8-6-2020) GL:ig7icd64.dll
+10:07:00:861(0000038)	[info ]	================================================================================
+10:07:00:901(0000039)	[info ]	current DPI: xdpi(96), ydpi(96) - DPI scaling: 1.0
+10:07:00:938(0000040)	[info ]	Geeks3D FurMark - demo started with an OpenGL 4.0 context.
+10:07:00:938(0000041)	[info ]	Quick OpenGL information (use /glinfo for more limits):
+10:07:00:938(0000042)	[info ]	GL_RENDERER: Intel(R) HD Graphics 4000
+10:07:00:938(0000043)	[info ]	GL_VENDOR: Intel
+10:07:00:938(0000044)	[info ]	GL_VERSION: 4.0.0 - Build 10.18.10.5161
+10:07:00:938(0000045)	[info ]	GL_SHADING_LANGUAGE_VERSION: 4.00 - Build 10.18.10.5161
+10:07:00:938(0000046)	[info ]	OpenGL version detected: 4.0
+10:07:00:938(0000047)	[info ]	OpenGL extensions: 188
+10:07:00:938(0000048)	[info ]	OpenGL hardware limits:
+10:07:00:938(0000049)	[info ]	  GL_MAX_VERTEX_ATTRIBS: 16
+10:07:00:938(0000050)	[info ]	  GL_MAX_VERTEX_UNIFORM_COMPONENTS: 4096
+10:07:00:938(0000051)	[info ]	  GL_MAX_FRAGMENT_UNIFORM_COMPONENTS: 4096
+10:07:00:938(0000052)	[info ]	  GL_MAX_TEXTURE_SIZE: 16384
+10:07:00:938(0000053)	[info ]	  GL_MAX_VIEWPORT_DIMS: 16384 16384
+10:07:00:938(0000054)	[info ]	  GL_MAX_TEXTURE_IMAGE_UNITS: 16
+10:07:00:938(0000055)	[info ]	  GL_MAX_COMBINED_TEXTURE_IMAGE_UNITS: 96
+10:07:00:938(0000056)	[info ]	Render window (Geeks3D FurMark) initialized (renderer type: OpenGL)
+10:07:00:999(0000057)	[info ]	[Lua] Lua version: Lua 5.4.8
+10:07:01:016(0000058)	[info ]	[Lua] LuaFileSystem initialized ok.
+10:07:01:016(0000059)	[info ]	[Lua] UTF8 initialized ok.
+10:07:01:023(0000060)	[info ]	[Lua] LuaSocket core initialized ok.
+10:07:01:023(0000061)	[info ]	[Lua] Mime core initialized ok.
+10:07:01:023(0000062)	[info ]	[Lua] LuaSQL SQLite3 driver initialized ok.
+10:07:01:029(0000063)	[info ]	[Lua] LuaGL initialized ok.
+10:07:01:031(0000064)	[info ]	[Lua] initialization ok.
+10:07:01:100(0000065)	[info ]	Scene compilation: SUCCESS.
+10:07:01:197(0000066)	[info ]	screen size detected: 1366 x 768
+10:07:04:420(0000067)	[info ]	FurMark 2.10.2 is starting up...
+10:07:04:422(0000068)	[info ]	DPI scale: -1.0
+10:07:04:422(0000069)	[info ]	Checking for new version...
+10:07:04:869(0000070)	[info ]	Your version is up to date
+10:07:05:315(0000071)	[info ]	[Vulkan2] Vulkan renderer plugin (Windows, Linux)
+10:07:05:316(0000072)	[error]	[Vulkan2] unable to load Vulkan core library.
+10:07:05:321(0000073)	[info ]	[Vulkan2] Vulkan renderer plugin (Windows, Linux)
+10:07:05:322(0000074)	[error]	[Vulkan2] unable to load Vulkan core library.
+10:07:05:325(0000075)	[info ]	- GPU 0: Intel(R) HD Graphics 4000
+10:07:05:325(0000076)	[info ]	scripts INIT execution: OK.
+10:07:05:425(0000077)	[info ]	Scene statistics:
+10:07:05:425(0000078)	[info ]	- 4 frames rendered during 0.098 seconds
+10:07:05:425(0000079)	[info ]	- average framerate: 40.8 FPS
+10:07:05:601(0000080)	[info ]	Stopping GeeXLab Player...
+10:07:06:392(0000081)	[info ]	GraphX Core stopped ok.
+10:07:06:392(0000082)	[info ]	Exit from GeeXLab Player.
