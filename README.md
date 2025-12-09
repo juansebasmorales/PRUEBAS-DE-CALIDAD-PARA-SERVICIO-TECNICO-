@@ -1,4 +1,7 @@
-¡Claro que sí! Aquí tiene el README.md final y completo, con todas las correcciones sobre la estructura de directorios y la organización mejorada, listo para que lo copie y pegue en su repositorio de GitHub.
+🔗 Enlace de Descarga Directa
+Haga clic en el siguiente enlace para descargar el archivo ZIP/RAR que contiene la carpeta /Pruebas/ completa y funcional:
+
+[LINK DE DESCARGA AQUÍ] (https://drive.google.com/drive/folders/1WuQ9IhrIqhadb2H8vC64Akm4YXoNaR2h?usp=sharing)
 
 🛠️ Suite de Diagnóstico y Pruebas para Servicio Técnico (PRUEBAS v10)
 Esta herramienta es un suite de diagnóstico por lotes (.bat) diseñado para estandarizar y optimizar la verificación y documentación del estado de hardware y software en equipos informáticos.
