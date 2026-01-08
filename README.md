@@ -102,3 +102,56 @@ Registro Fotográfico: El script recuerda al técnico que debe tomar fotos de ev
 Ubicación de Reportes: Todos los informes generados (AIDA64, Batería, etc.) se almacenan en:
 
 /Pruebas/Informes/
+
+🚀 Flujo de Trabajo (Opción 0)
+Al seleccionar la Opción 0, el programa inicia un flujo automatizado:
+
+Identificación de Orden: Solicita un número (ej. E123) para nombrar todos los informes.
+
+Segundo Plano: Lanza automáticamente powercfg (Batería) y AIDA64 en modo silencioso.
+
+Diagnóstico de Discos: Abre Hard Disk Sentinel, CrystalDiskInfo y HD Tune Pro simultáneamente para que analicen el estado de salud mientras avanzas con las pruebas manuales.
+
+📋 Secuencia de Pruebas Manuales
+El script guía al técnico paso a paso, abriendo la herramienta necesaria y solicitando el estado (OK / FAIL / N/A):
+
+Paso 1: Prueba de Teclado.
+
+Paso 16 (NUEVO): Prueba de Touchpad (Verificación de puntero y botones).
+
+Pasos 2-5: Temperatura (HWMonitor), Pantalla (IsMyLcdOK), Cámara y Micrófono.
+
+Pasos 6-11: HDMI/VGA, Carga de Batería, Cable de Red, WiFi, Bluetooth y Puertos USB.
+
+Pasos 12-14: Sonido (Parlantes/Jack), Unidad DVD y Administrador de Dispositivos.
+
+Paso 15: Activación de Licencias (Windows/Office vía MAS).
+
+💎 Características Especiales Implementadas
+🖥️ Motor de Detección de Hardware (Zero-Error)
+Se ha mejorado la extracción de datos mediante wmic y PowerShell para evitar cierres inesperados:
+
+Detección de GPU: Nombre exacto de la tarjeta de video (Intel, NVIDIA, AMD).
+
+Tipo de RAM: Identifica automáticamente si es DDR3, DDR4 o DDR5.
+
+Almacenamiento: Muestra todos los modelos de disco y sus capacidades en el encabezado.
+
+📊 Reporte HTML "Elastic Design"
+El informe final generado en /Informes/ cuenta con tecnología CSS Flexbox:
+
+Ajuste Automático: El checklist ocupa exactamente el 100% de la pantalla sin necesidad de hacer scroll ni zoom, sin importar si el monitor es de 13" o 4K.
+
+Código de Colores Profesional: Verde para estados OK, Rojo para FALLAS (con detalle del técnico) y Azul para No Aplica.
+
+⚙️ Herramientas de Estrés (Opciones 22-24)
+CPU: Prime95 para estabilidad térmica al 100%.
+
+GPU Núcleo: FurMark para detectar throttling o apagados.
+
+GPU Memoria: OCCT para verificar la integridad de la VRAM.
+
+📂 Evidencia y Documentación
+Todos los resultados se consolidan en la carpeta /Pruebas/Informes/. Se recomienda al técnico realizar el registro fotográfico de los daños físicos que el software no puede detectar (puertos rotos, bisagras, etc.) para complementar el checklist generado.
+
+Desarrollado para optimizar el soporte técnico de nivel componente. 🛠️✅
