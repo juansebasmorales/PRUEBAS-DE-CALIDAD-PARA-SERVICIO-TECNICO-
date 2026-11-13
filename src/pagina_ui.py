@@ -148,22 +148,67 @@ def pedir_pin(app) -> str | None:
     return None
 
 
+COLUMNAS = (("orden", "Orden", 80), ("estado", "Estado", 150), ("cliente", "Cliente", 90),
+            ("equipo", "Marca y modelo", 170), ("serie", "Serie", 120), ("ingreso", "Ingreso", 82))
+
+
+def fila_orden(o: dict) -> tuple:
+    eq = o.get("equipo") or {}
+    return (o.get("orden", ""), o.get("estado_nombre") or o.get("estado", ""), o.get("cliente", ""),
+            " ".join(x for x in (eq.get("marca"), eq.get("modelo")) if x), eq.get("serie", ""),
+            pagina.fecha_corta(o.get("ingreso")))
+
+
 class ElegirOrden:
-    """Confirma la orden encontrada por la serie (o deja buscar por número / QR) y si es entrada o salida."""
+    """
+    Si la serie encontró la orden, la muestra para confirmar. Si no, o con 'Elegir otra orden', muestra la lista de
+    órdenes abiertas de la empresa (acción 'listar') con un buscador. Al final: entrada o salida.
+    """
 
     def __init__(self, app, ordenes: list[dict], al_elegir, mensaje: str = ""):
-        self.app, self.al_elegir, self.ordenes = app, al_elegir, ordenes
+        from tkinter import ttk
+        self.app, self.al_elegir, self.ordenes = app, al_elegir, []
+        self._consulta = 0
         t = self.top = tk.Toplevel(app.root)
-        t.title("Orden de servicio")
+        t.title("Elegir orden de servicio")
         t.configure(bg="white", padx=18, pady=14)
         t.transient(app.root)
         t.grab_set()
-        self.lbl = tk.Label(t, text=mensaje, font=("Segoe UI", 10, "bold"), bg="white", wraplength=560,
+        self.lbl = tk.Label(t, text=mensaje, font=("Segoe UI", 10, "bold"), bg="white", wraplength=700,
                             justify="left")
         self.lbl.pack(anchor="w")
-        self.lista = tk.Listbox(t, font=FUENTE, height=5, width=62, activestyle="none")
-        self.lista.pack(fill="x", pady=8)
-        self.lista.bind("<<ListboxSelect>>", lambda e: self._sugerir())
+
+        bus = tk.Frame(t, bg="white")
+        bus.pack(fill="x", pady=(8, 0))
+        tk.Label(bus, text="Buscar (número, nombre, marca, modelo, serie o QR):", font=("Segoe UI", 9), bg="white",
+                 fg="#555").pack(anchor="w")
+        self.ent = tk.Entry(bus, font=FUENTE, width=40)
+        self.ent.pack(side="left")
+        self.ent.bind("<Return>", lambda e: self._buscar())
+        tk.Button(bus, text="Buscar", font=("Segoe UI", 10), relief="flat", bg="#e3e6ea", padx=10,
+                  command=self._buscar).pack(side="left", padx=6)
+        self.var_solo = tk.BooleanVar(value=False)
+        tk.Checkbutton(bus, text="Solo las que están en pruebas", variable=self.var_solo, bg="white",
+                       font=("Segoe UI", 9), command=self._buscar).pack(side="left", padx=6)
+
+        marco = tk.Frame(t, bg="white")
+        marco.pack(fill="both", expand=True, pady=8)
+        estilo = ttk.Style(t)
+        estilo.configure("Ordenes.Treeview", font=("Segoe UI", 10), rowheight=26)
+        estilo.configure("Ordenes.Treeview.Heading", font=("Segoe UI", 9, "bold"))
+        self.tabla = ttk.Treeview(marco, columns=[c[0] for c in COLUMNAS], show="headings", height=10,
+                                  selectmode="browse", style="Ordenes.Treeview")
+        for col, titulo, ancho in COLUMNAS:
+            self.tabla.heading(col, text=titulo)
+            self.tabla.column(col, width=ancho, anchor="w", stretch=col in ("equipo", "estado"))
+        barra = ttk.Scrollbar(marco, orient="vertical", command=self.tabla.yview)
+        self.tabla.configure(yscrollcommand=barra.set)
+        self.tabla.pack(side="left", fill="both", expand=True)
+        barra.pack(side="right", fill="y")
+        self.tabla.bind("<<TreeviewSelect>>", lambda e: self._sugerir())
+        self.tabla.bind("<Double-1>", lambda e: self._usar())
+        self.tabla.bind("<Return>", lambda e: self._usar())
+
         fila = tk.Frame(t, bg="white")
         fila.pack(fill="x")
         tk.Label(fila, text="Pruebas de:", font=("Segoe UI", 10, "bold"), bg="white").pack(side="left")
@@ -171,66 +216,88 @@ class ElegirOrden:
         for v, txt in (("entrada", "Entrada (cómo llegó)"), ("salida", "Salida (después de la reparación)")):
             tk.Radiobutton(fila, text=txt, value=v, variable=self.var_tipo, bg="white",
                            font=("Segoe UI", 10)).pack(side="left", padx=6)
-        otra = tk.Frame(t, bg="white")
-        otra.pack(fill="x", pady=(12, 0))
-        tk.Label(otra, text="Buscar por número de orden o QR del comprobante:", font=("Segoe UI", 9), bg="white",
-                 fg="#555").pack(anchor="w")
-        self.ent = tk.Entry(otra, font=FUENTE, width=40)
-        self.ent.pack(side="left")
-        self.ent.bind("<Return>", lambda e: self._buscar())
-        tk.Button(otra, text="Buscar", font=("Segoe UI", 10), relief="flat", bg="#e3e6ea", padx=10,
-                  command=self._buscar).pack(side="left", padx=6)
+
         bot = tk.Frame(t, bg="white")
         bot.pack(fill="x", pady=(14, 0))
         tk.Button(bot, text="Seguir sin la página", font=("Segoe UI", 10), relief="flat", bg="#e3e6ea", padx=10,
                   command=lambda: self._fin(None)).pack(side="left")
+        self.btn_otra = tk.Button(bot, text="Elegir otra orden", font=("Segoe UI", 10), relief="flat",
+                                  bg="#e3e6ea", padx=10, command=self._lista_completa)
+        self.btn_otra.pack(side="left", padx=8)
         tk.Button(bot, text="USAR ESTA ORDEN", font=("Segoe UI", 11, "bold"), relief="flat", bg="#0b5ed7",
                   fg="white", padx=16, command=self._usar).pack(side="right")
         t.protocol("WM_DELETE_WINDOW", lambda: self._fin(None))
-        self._mostrar(ordenes)
-        (self.lista if ordenes else self.ent).focus_set()
+        if ordenes:
+            self._mostrar(ordenes)
+            self.tabla.focus_set()
+        else:
+            self.btn_otra.pack_forget()
+            self._consultar("", mensaje)
+            self.ent.focus_set()
 
     def _mostrar(self, ordenes: list[dict]):
         self.ordenes = ordenes
-        self.lista.delete(0, "end")
-        for o in ordenes:
-            self.lista.insert("end", pagina.describir(o))
+        self.tabla.delete(*self.tabla.get_children())
+        for i, o in enumerate(ordenes):
+            self.tabla.insert("", "end", iid=str(i), values=fila_orden(o))
         if ordenes:
-            self.lista.selection_set(0)
+            self.tabla.selection_set("0")
+            self.tabla.focus("0")
             self._sugerir()
 
+    def _elegida(self) -> dict | None:
+        sel = self.tabla.selection()
+        return self.ordenes[int(sel[0])] if sel else None
+
     def _sugerir(self):
-        sel = self.lista.curselection()
-        if sel:
-            self.var_tipo.set(self.ordenes[sel[0]].get("tipo_sugerido") or "entrada")
+        o = self._elegida()
+        if o:
+            self.var_tipo.set(o.get("tipo_sugerido") or "entrada")
+
+    def _lista_completa(self):
+        self.btn_otra.pack_forget()
+        self.ent.delete(0, "end")
+        self._consultar("", "")
 
     def _buscar(self):
-        texto = self.ent.get().strip()
-        if not texto:
-            return
-        self.lbl.configure(text="Buscando...", fg="#555")
+        self._consultar(self.ent.get().strip(), "")
+
+    def _consultar(self, texto: str, mensaje: str):
+        """El QR se busca con 'buscar' (código del comprobante); todo lo demás con 'listar'."""
+        self._consulta += 1
+        n, solo, clave = self._consulta, bool(self.var_solo.get()), self.app.clave_pagina
+        self.lbl.configure(text=(mensaje + "\n" if mensaje else "") + "Cargando órdenes...", fg="#555")
 
         def hilo():
             try:
-                res = pagina.buscar(self.app.clave_pagina, texto=texto)
-                msg = (f"{len(res)} orden(es) encontrada(s)." if res else
-                       "No se encontró ninguna orden abierta con ese número o QR.")
-                self.app.ui_async(self._resultado, res, msg)
+                if pagina.es_qr(texto):
+                    res = pagina.buscar(clave, texto=texto)
+                else:
+                    res = pagina.listar(clave, texto=texto, solo_pruebas=solo)
+                if res:
+                    msg = f"{len(res)} orden(es) abierta(s){' con «' + texto + '»' if texto else ''}. Toca una:"
+                else:
+                    msg = (f"No hay órdenes abiertas con «{texto}»." if texto else
+                           "No hay órdenes abiertas en la página.")
+                self.app.ui_async(self._resultado, n, res, (mensaje + "\n" if mensaje else "") + msg)
             except pagina.ErrorPagina as e:
-                self.app.ui_async(self._resultado, [], e.para_tecnico())
+                if e.codigo == 401:
+                    self.app.clave_pagina = None
+                self.app.ui_async(self._resultado, n, [], e.para_tecnico())
         threading.Thread(target=hilo, daemon=True).start()
 
-    def _resultado(self, res, msg):
-        if self.top.winfo_exists():
-            self.lbl.configure(text=msg, fg="#222" if res else "#d93025")
-            self._mostrar(res)
+    def _resultado(self, n, res, msg):
+        if n != self._consulta or not self.top.winfo_exists():
+            return  # llegó la respuesta de una búsqueda anterior
+        self.lbl.configure(text=msg, fg="#222" if res else "#d93025")
+        self._mostrar(res)
 
     def _usar(self):
-        sel = self.lista.curselection()
-        if not sel:
-            self.lbl.configure(text="Elige una orden de la lista (o busca por número / QR).", fg="#d93025")
+        o = self._elegida()
+        if not o:
+            self.lbl.configure(text="Elige una orden de la lista (o búscala arriba).", fg="#d93025")
             return
-        self._fin((self.ordenes[sel[0]], self.var_tipo.get()))
+        self._fin((o, self.var_tipo.get()))
 
     def _fin(self, eleccion):
         self.top.grab_release()

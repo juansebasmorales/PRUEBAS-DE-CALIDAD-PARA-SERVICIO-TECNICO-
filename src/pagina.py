@@ -110,7 +110,13 @@ def llamar(clave: str, accion: str, **campos) -> dict:
         raise ErrorPagina(502, "Respuesta no válida de la página") from None
     if not datos.get("ok"):
         raise ErrorPagina(200, str(datos.get("motivo") or datos.get("error") or "La página respondió sin ok"), datos)
+    if isinstance(datos.get("limites"), dict):   # llega en probar, buscar y listar: el programa se ajusta solo
+        LIMITES.clear()
+        LIMITES.update(datos["limites"])
     return datos
+
+
+LIMITES: dict = {}   # los últimos 'limites' que informó la página
 
 
 def subir(url: str, ruta: str, tipo: str) -> None:
@@ -141,11 +147,28 @@ def buscar(clave: str, texto: str = "", serie: str = "") -> list[dict]:
     texto = (texto or "").strip()
     if serie:
         campos = {"serie": serie}
-    elif re.match(r"^https?://", texto, re.I) or "?s=" in texto:
+    elif es_qr(texto):
         campos = {"codigo": texto}
     else:
         campos = {"orden": texto}
     return llamar(clave, "buscar", **campos).get("ordenes", [])
+
+
+def es_qr(texto: str) -> bool:
+    return bool(re.match(r"^https?://", texto or "", re.I) or "?s=" in (texto or ""))
+
+
+def listar(clave: str, texto: str = "", solo_pruebas: bool = False, limite: int = 50) -> list[dict]:
+    """Órdenes abiertas de la empresa (primero las que están en pruebas). 'texto' filtra por número, nombre,
+    marca, modelo o serie."""
+    return llamar(clave, "listar", texto=(texto or "").strip(), solo_pruebas=bool(solo_pruebas),
+                  limite=max(1, min(100, int(limite)))).get("ordenes", [])
+
+
+def fecha_corta(valor) -> str:
+    """'2026-11-13T15:05:00Z' -> '13/11/2026'."""
+    m = re.match(r"(\d{4})-(\d{2})-(\d{2})", str(valor or ""))
+    return f"{m.group(3)}/{m.group(2)}/{m.group(1)}" if m else str(valor or "")
 
 
 def describir(o: dict) -> str:
@@ -292,8 +315,13 @@ def armar_archivos(carpeta: str, orden: str, origen: dict, html_reporte: str,
     os.makedirs(salida, exist_ok=True)
     archivos: list[tuple[dict, str]] = []
 
+    try:
+        max_bytes = int(float(LIMITES.get("mb_archivo") or 15) * 1024 * 1024)
+    except (TypeError, ValueError):
+        max_bytes = MAX_BYTES
+
     def agregar(meta: dict, ruta: str) -> bool:
-        if len(archivos) < limite and os.path.isfile(ruta) and 0 < os.path.getsize(ruta) <= MAX_BYTES:
+        if len(archivos) < limite and os.path.isfile(ruta) and 0 < os.path.getsize(ruta) <= max_bytes:
             archivos.append(({**meta, "tam": os.path.getsize(ruta)}, ruta))
             return True
         return False
@@ -339,7 +367,8 @@ def armar_archivos(carpeta: str, orden: str, origen: dict, html_reporte: str,
 def limite_archivos(respuesta: dict) -> int:
     """Si la página informa su límite ('limites': {'archivos': N}), se usa; si no, 10."""
     try:
-        return max(1, int((respuesta.get("limites") or {}).get("archivos") or MAX_ARCHIVOS))
+        lim = LIMITES or respuesta.get("limites") or {}
+        return max(1, int(lim.get("archivos") or MAX_ARCHIVOS))
     except (TypeError, ValueError):
         return MAX_ARCHIVOS
 

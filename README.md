@@ -48,10 +48,12 @@ nombre de la USB, y **Probar conexión**. La clave queda **cifrada con el PIN** 
 sin el PIN no sirve.
 
 Con la página configurada, **INICIAR** pide el PIN (una vez por sesión) y busca la orden **por la serie del
-equipo**. Si no la encuentra, se escribe el número de orden (`OS-0012` o `12`) o se escanea el QR del comprobante.
-Se confirma la orden y si son pruebas de **entrada** o de **salida**. Al terminar el recorrido se envían solos los
-resultados, el **reporte PDF con todas las fotos**, las fotos de cada prueba (primero las de las fallas) y los
-informes de batería y AIDA64 en PDF (con las claves de producto tapadas). Si no hay internet queda en cola y se
+equipo**. Si la encuentra, se confirma; si no (o con **Elegir otra orden**) sale la **lista de órdenes abiertas**
+de la empresa (primero las que están en pruebas) con número, estado, cliente, marca y modelo, serie y fecha de
+ingreso, y un buscador por número, nombre, marca, modelo, serie o QR del comprobante. Se elige si son pruebas de
+**entrada** o de **salida**. Al terminar el recorrido se envían solos los resultados, el **reporte PDF**, **todas
+las fotos** de cada prueba (primero las de las fallas; la página acepta 60 archivos por envío y el programa lee
+ese límite) y los informes de batería y AIDA64 en PDF (con las claves de producto tapadas). Si no hay internet queda en cola y se
 reintenta con el mismo envío (no duplica). En la revisión está el botón **ENVIAR A LA PÁGINA** para mandarlo de
 nuevo. Cada envío queda anotado en `Informes\<orden>\pagina_registro.txt`.
 

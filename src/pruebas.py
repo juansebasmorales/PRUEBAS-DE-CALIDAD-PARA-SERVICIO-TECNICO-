@@ -30,7 +30,7 @@ import pagina_ui
 import reporte
 import ventanas as win
 
-VERSION = "22.2"
+VERSION = "22.3"
 
 if "__compiled__" in globals():
     BASE = os.path.dirname(os.path.abspath(sys.argv[0]))
@@ -730,11 +730,11 @@ class App:
                     msg = (f"Orden encontrada {'por la serie ' + serie if serie else ''}. Confírmala:"
                            if len(res) == 1 else f"{len(res)} órdenes coinciden: elige una.")
                 elif serie:
-                    msg = f"No hay orden abierta con la serie {serie}. Busca por número de orden o escanea el QR."
+                    msg = f"No hay orden abierta con la serie {serie}. Elígela de la lista o búscala."
                 elif escrito:
-                    msg = f"No se encontró la orden «{escrito}». Prueba otro número o el QR."
+                    msg = f"No se encontró la orden «{escrito}». Elígela de la lista o búscala."
                 else:
-                    msg = "La serie de este equipo no sirve para buscar. Escribe el número de orden o escanea el QR."
+                    msg = "La serie de este equipo no sirve para buscar. Elige la orden de la lista o búscala."
             except pagina.ErrorPagina as e:
                 res, msg = [], e.para_tecnico()
                 if e.codigo == 401:
