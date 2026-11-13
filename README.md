@@ -40,6 +40,21 @@ Si se cierra a la mitad, al escribir la misma orden pregunta si continuar donde 
 - `umbral_bateria`: % de salud mínimo para marcar la batería OK (60 por defecto).
 - `herramientas`: ruta (relativa a `ProgramData`) y argumentos de cada herramienta.
 
+## Página de órdenes de servicio
+
+En la pantalla principal, **Página de órdenes → Configurar**: pegar la clave `tp_…` (la crea el administrador en
+la página: Ajustes → Programa de pruebas de calidad → Crear clave), ponerle un **PIN del taller** (mínimo 6) y el
+nombre de la USB, y **Probar conexión**. La clave queda **cifrada con el PIN** en `config.json` (AES-256 + HMAC);
+sin el PIN no sirve.
+
+Con la página configurada, **INICIAR** pide el PIN (una vez por sesión) y busca la orden **por la serie del
+equipo**. Si no la encuentra, se escribe el número de orden (`OS-0012` o `12`) o se escanea el QR del comprobante.
+Se confirma la orden y si son pruebas de **entrada** o de **salida**. Al terminar el recorrido se envían solos los
+resultados, el **reporte PDF con todas las fotos**, las fotos de cada prueba (primero las de las fallas) y los
+informes de batería y AIDA64 en PDF (con las claves de producto tapadas). Si no hay internet queda en cola y se
+reintenta con el mismo envío (no duplica). En la revisión está el botón **ENVIAR A LA PÁGINA** para mandarlo de
+nuevo. Cada envío queda anotado en `Informes\<orden>\pagina_registro.txt`.
+
 ## Actualizar (en cada USB o PC)
 
 Doble clic en **`ACTUALIZAR.bat`**. Compara con la carpeta pública de Google Drive y baja **solo los archivos que

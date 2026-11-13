@@ -25,10 +25,12 @@ from dataclasses import dataclass, field
 from tkinter import messagebox, simpledialog, ttk
 
 import detectar
+import pagina
+import pagina_ui
 import reporte
 import ventanas as win
 
-VERSION = "22.1"
+VERSION = "22.2"
 
 if "__compiled__" in globals():
     BASE = os.path.dirname(os.path.abspath(sys.argv[0]))
@@ -442,6 +444,9 @@ class App:
         self.usb_base: set[str] = set()
         self.usb_vistas: list[str] = []
         self.monitores_base = 1
+        self.clave_pagina: str | None = None   # descifrada con el PIN; solo en memoria
+        self.enlace: dict | None = None        # orden de la página {id, orden, lista, ...} y 'tipo'
+        self.envio_estado = ""
 
         self.barra = Barra(self)
         self.cuerpo = tk.Frame(self.root, bg="#f4f5f7")
@@ -588,6 +593,17 @@ class App:
         tk.Button(red, text="Configurar nueva red", font=("Segoe UI", 10, "bold"), relief="flat", bg="#0b5ed7",
                   fg="white", padx=12, command=self._config_wifi).pack(side="right", padx=8)
 
+        web = tk.Frame(c, bg="white", highlightthickness=1, highlightbackground="#ddd")
+        web.pack(fill="x", pady=(0, 12))
+        tk.Label(web, text="Página de órdenes", font=("Segoe UI", 11, "bold"), bg="white").pack(
+            side="left", padx=(14, 10), pady=10)
+        self.lbl_web = tk.Label(web, text="", font=("Segoe UI", 10), bg="white", fg="#333", anchor="w")
+        self.lbl_web.pack(side="left", fill="x", expand=True)
+        tk.Button(web, text="Configurar", font=("Segoe UI", 10, "bold"), relief="flat", bg="#0b5ed7", fg="white",
+                  padx=12, command=lambda: pagina_ui.ConfigPagina(self, self._web_guardada)).pack(side="right",
+                                                                                                   padx=(8, 14))
+        self._refrescar_web()
+
         tk.Label(c, text="Equipo detectado", font=("Segoe UI", 12, "bold"), bg="#f4f5f7").pack(anchor="w")
         self.lbl_resumen = tk.Label(c, text="", font=("Consolas", 10), bg="white", fg="#222", justify="left",
                                     anchor="nw", padx=14, pady=10, highlightthickness=1,
@@ -653,16 +669,185 @@ class App:
         os.startfile(INFORMES)
 
     # ------------------------------------------------------------------ iniciar orden
+    # ------------------------------------------------------------------ página de órdenes
+    def _web_configurada(self) -> bool:
+        return bool((self.cfg.get("pagina") or {}).get("clave"))
+
+    def _refrescar_web(self):
+        if not hasattr(self, "lbl_web") or not self.lbl_web.winfo_exists():
+            return
+        p = self.cfg.get("pagina") or {}
+        if not p.get("clave"):
+            txt = "Sin configurar: las pruebas no se envían a la página"
+        else:
+            txt = (f"{p.get('empresa') or 'Clave guardada'} · {p.get('pc', '')} · "
+                   + ("desbloqueada" if self.clave_pagina else "se pedirá el PIN al iniciar"))
+        self.lbl_web.configure(text=txt)
+
+    def _web_guardada(self):
+        guardar_config(self.cfg)
+        self._refrescar_web()
+        if self.clave_pagina:
+            self._reintentar_pendientes()
+
     def _iniciar(self):
         if self.trabajando:
             return
-        orden = re.sub(r"[^A-Za-z0-9_-]", "", self.ent_orden.get().strip().upper())
-        if not orden:
-            messagebox.showwarning("PRUEBAS", "Escribe el número de orden (ej: E123).", parent=self.root)
-            return
+        escrito = self.ent_orden.get().strip()
         self.cfg["tecnico"] = self.ent_tec.get().strip()
         self.cfg["estres"] = bool(self.var_estres.get())
         guardar_config(self.cfg)
+        if self._web_configurada():
+            if not self.clave_pagina:
+                self.clave_pagina = pagina_ui.pedir_pin(self)
+                self._refrescar_web()
+                if self.clave_pagina:
+                    self._reintentar_pendientes()
+            if self.clave_pagina:
+                self._buscar_orden(escrito)
+                return
+        orden = re.sub(r"[^A-Za-z0-9_-]", "", escrito.upper())
+        if not orden:
+            messagebox.showwarning("PRUEBAS", "Escribe el número de orden (ej: E123).", parent=self.root)
+            return
+        self._arrancar(orden, None)
+
+    def _buscar_orden(self, escrito: str):
+        """Busca la orden en la página: por lo escrito (número o QR) o, si no se escribió nada, por la serie."""
+        self.lbl_web.configure(text="Buscando la orden en la página...")
+
+        def hilo():
+            serie = ""
+            if not escrito:
+                self.ev_hw.wait(60)
+                serie = pagina.serie_del_equipo(self.hw)
+            try:
+                if escrito or serie:
+                    res = pagina.buscar(self.clave_pagina, texto=escrito, serie=serie)
+                else:
+                    res = []
+                if res:
+                    msg = (f"Orden encontrada {'por la serie ' + serie if serie else ''}. Confírmala:"
+                           if len(res) == 1 else f"{len(res)} órdenes coinciden: elige una.")
+                elif serie:
+                    msg = f"No hay orden abierta con la serie {serie}. Busca por número de orden o escanea el QR."
+                elif escrito:
+                    msg = f"No se encontró la orden «{escrito}». Prueba otro número o el QR."
+                else:
+                    msg = "La serie de este equipo no sirve para buscar. Escribe el número de orden o escanea el QR."
+            except pagina.ErrorPagina as e:
+                res, msg = [], e.para_tecnico()
+                if e.codigo == 401:
+                    self.clave_pagina = None
+            self.ui_async(self._refrescar_web)
+            self.ui_async(lambda: pagina_ui.ElegirOrden(self, res, lambda el: self._orden_elegida(el, escrito), msg))
+        threading.Thread(target=hilo, daemon=True).start()
+
+    def _orden_elegida(self, eleccion, escrito: str):
+        if not eleccion:  # 'Seguir sin la página'
+            orden = re.sub(r"[^A-Za-z0-9_-]", "", escrito.upper())
+            if not orden:
+                messagebox.showinfo("PRUEBAS", "Sin la página hace falta escribir el número de orden.",
+                                    parent=self.root)
+                return
+            self._arrancar(orden, None)
+            return
+        o, tipo = eleccion
+        enlace = {"id": o["id"], "orden": o.get("orden", ""), "lista": o.get("lista", []), "tipo": tipo,
+                  "equipo": o.get("equipo", {})}
+        nombre = re.sub(r"[^A-Za-z0-9_-]", "", (o.get("orden") or "").upper()) or "ORDEN"
+        # entrada y salida son recorridos distintos: cada uno en su carpeta
+        self._arrancar(f"{nombre}_SALIDA" if tipo == "salida" else nombre, enlace)
+
+    def _reintentar_pendientes(self):
+        """Envíos que quedaron sin confirmar (sin internet, programa cerrado): se reintentan con su mismo envio_id."""
+        clave = self.clave_pagina
+
+        def hilo():
+            for carpeta, envio in pagina.pendientes(INFORMES):
+                try:
+                    pagina.ejecutar_envio(clave, carpeta, envio)
+                except pagina.ErrorPagina:
+                    continue
+        if clave:
+            threading.Thread(target=hilo, daemon=True).start()
+
+    def _enviar_pagina(self, manual: bool = False):
+        """Arma el envío (resultados + reporte PDF + fotos) y lo manda en segundo plano, con reintentos."""
+        if manual and self.enlace and not self.clave_pagina and self._web_configurada():
+            self.clave_pagina = pagina_ui.pedir_pin(self)
+        if not self.enlace or not self.clave_pagina:
+            if manual:
+                messagebox.showinfo("PRUEBAS", "Esta orden no está enlazada con la página (o falta el PIN).",
+                                    parent=self.root)
+            return
+        datos = self._datos_reporte()
+        carpeta, orden, enlace, clave = self.carpeta, self.orden, dict(self.enlace), self.clave_pagina
+        limite = pagina.limite_archivos(self.cfg.get("pagina") or {})
+        pc = (self.cfg.get("pagina") or {}).get("pc") or "USB taller"
+
+        def estado(txt):
+            self.envio_estado = txt
+            self.ui_async(self._mostrar_envio)
+
+        def hilo():
+            estado("Preparando el envío a la página (reporte PDF y fotos)...")
+            aida = os.path.isfile(os.path.join(carpeta, f"{orden}_AIDA.html"))
+            resultados, origen = pagina.armar_resultados(datos["pasos"], enlace["lista"], aida)
+            if not resultados:
+                estado("Ninguna prueba coincide con la lista de la orden: no se envió nada.")
+                return
+            html = os.path.join(carpeta, f"{orden}_CHECKLIST.html")
+            archivos = pagina.armar_archivos(carpeta, orden, origen, html, limite)
+            envio = pagina.nuevo_envio(carpeta, enlace, enlace["tipo"], pc, VERSION, resultados, archivos)
+            for espera in (0,) + pagina.REINTENTOS:
+                if espera:
+                    estado(f"Sin respuesta de la página: se reintenta en {espera // 60 or espera}"
+                           f"{' min' if espera >= 60 else ' s'}...")
+                    time.sleep(espera)
+                try:
+                    pagina.ejecutar_envio(clave, carpeta, envio, aviso=estado)
+                except pagina.ErrorPagina as e:
+                    if e.codigo == 401:
+                        self.clave_pagina = None
+                    if not e.reintentar:
+                        estado(e.para_tecnico())
+                        return
+                    continue
+                self._registro_envio(carpeta, envio)
+                txt = pagina.resumen(envio)
+                faltan = (envio.get("confirmacion") or {}).get("faltan_evidencia") or \
+                    (envio.get("respuesta") or {}).get("faltan_evidencia")
+                if faltan:
+                    txt += " · ⚠ Falta foto en: " + ", ".join(faltan)
+                estado(txt)
+                return
+            estado("No se pudo enviar (sin internet). Queda guardado y se reintenta al volver a abrir PRUEBAS.")
+        threading.Thread(target=hilo, daemon=True).start()
+
+    def _registro_envio(self, carpeta: str, envio: dict):
+        """Lo que la página no tomó y por qué (se deja en la carpeta de la orden, sin la clave)."""
+        r = envio.get("respuesta") or {}
+        lineas = [f"[{datetime.datetime.now():%Y-%m-%d %H:%M}] {envio.get('tipo')} {envio.get('orden')} "
+                  f"envio {envio.get('envio_id')}: {r.get('aplicadas')} aplicadas, cuenta {r.get('cuenta')}, "
+                  f"archivos guardados {(envio.get('confirmacion') or {}).get('guardados')}"]
+        for nombre, motivo in (r.get("ignorados") or {}).items():
+            lineas.append(f"   ignorado: {nombre}: {motivo}")
+        for pos, motivo in ((envio.get("confirmacion") or {}).get("rechazados") or {}).items():
+            lineas.append(f"   archivo rechazado #{pos}: {motivo}")
+        try:
+            with open(os.path.join(carpeta, "pagina_registro.txt"), "a", encoding="utf-8") as fh:
+                fh.write("\n".join(lineas) + "\n")
+        except OSError:
+            pass
+
+    def _mostrar_envio(self):
+        if hasattr(self, "lbl_envio") and self.lbl_envio.winfo_exists():
+            self.lbl_envio.configure(text=("Página: " + self.envio_estado) if self.envio_estado else "")
+
+    def _arrancar(self, orden: str, enlace: dict | None):
+        self.enlace = enlace
+        self.envio_estado = ""
         self.orden = orden
         self.carpeta = os.path.join(INFORMES, orden)
         os.makedirs(os.path.join(self.carpeta, "fotos"), exist_ok=True)
@@ -673,7 +858,10 @@ class App:
                                    "¿Continuar donde quedó? (No = empezar de cero)", parent=self.root):
                 try:
                     with open(estado_previo, encoding="utf-8") as fh:
-                        self.resultados = json.load(fh).get("resultados", {})
+                        previo = json.load(fh)
+                    self.resultados = previo.get("resultados", {})
+                    if self.enlace is None and previo.get("enlace"):
+                        self.enlace = previo["enlace"]  # la orden ya estaba enlazada con la página
                 except (OSError, ValueError):
                     self.resultados = {}
         self.pasos = self._armar_pasos()
@@ -736,7 +924,8 @@ class App:
             P("camara", "Cámara web", "Comprueba que se vea la imagen. La foto queda con la vista de la cámara.",
               "microsoft.windows.camera:", auto=self._auto_camara),
             P("microfono", "Micrófono", "Graba unos segundos y reproduce.", "microfono"),
-            P("sonido", "Sonido (parlantes y jack)", "Escucha ambos parlantes y prueba el jack de audífonos.",
+            P("sonido", "Parlantes", "Escucha el parlante izquierdo y el derecho.", "sonido"),
+            P("jack", "Jack de audio (audífonos)", "Conecta audífonos y comprueba que se escuche por ellos.",
               "sonido"),
             P("carga", "Carga de batería", "Conecta el cargador. Se aprueba sola al detectar que carga.",
               auto=self._auto_carga, poll=self._poll_carga),
@@ -789,6 +978,8 @@ class App:
         self.largas = {}
         self._guardar_estado()
         self.ui(self._generar_reporte, False)
+        if not solo and self.enlace:
+            self.ui(self._enviar_pagina)  # sola al terminar el recorrido
 
     def _titulo(self, paso: Paso) -> str:
         visibles = [p for p in self.pasos if p.en_reporte]
@@ -1039,7 +1230,8 @@ class App:
     def _guardar_estado(self):
         try:
             with open(os.path.join(self.carpeta, "estado.json"), "w", encoding="utf-8") as fh:
-                json.dump({"orden": self.orden, "resultados": self.resultados}, fh, ensure_ascii=False, indent=1)
+                json.dump({"orden": self.orden, "resultados": self.resultados, "enlace": self.enlace}, fh,
+                          ensure_ascii=False, indent=1)
         except OSError:
             pass
 
@@ -1226,6 +1418,13 @@ class App:
         self.botonera.pack(fill="x")
         self.fila_reportes = tk.Frame(c, bg="#f4f5f7")
         self.fila_reportes.pack(fill="x", pady=(8, 0))
+        self.lbl_envio = tk.Label(c, text="", font=("Segoe UI", 10, "bold"), bg="#f4f5f7", fg="#0b5ed7",
+                                  anchor="w", justify="left", wraplength=int(900 * self.escala))
+        self.lbl_envio.pack(fill="x", pady=(6, 0))
+        if self.enlace:
+            self.envio_estado = self.envio_estado or (f"enlazada con {self.enlace.get('orden')} "
+                                                      f"({self.enlace.get('tipo')}); se envía al terminar")
+        self._mostrar_envio()
         self._refrescar_tabla()
         self._botones_revision(en_curso)
 
@@ -1243,6 +1442,10 @@ class App:
             tk.Button(self.fila_reportes, text="UNIR REPORTES (un solo archivo)", font=("Segoe UI", 10, "bold"),
                       relief="flat", bg="#6f42c1", fg="white", padx=12,
                       command=self._unir_reportes).pack(side="left", padx=(6, 0))
+            if self.enlace:
+                tk.Button(self.fila_reportes, text="ENVIAR A LA PÁGINA", font=("Segoe UI", 10, "bold"),
+                          relief="flat", bg="#1e8e3e", fg="white", padx=12,
+                          command=lambda: self._enviar_pagina(manual=True)).pack(side="right")
         if en_curso:
             tk.Button(self.botonera, text="Detener recorrido", font=("Segoe UI", 10), relief="flat", bg="#e3e6ea",
                       padx=10, command=lambda: self.decidir("TERMINAR")).pack(side="left")
@@ -1408,6 +1611,7 @@ class App:
         if self.trabajando:
             return
         self.orden, self.carpeta, self.resultados = "", "", {}
+        self.enlace, self.envio_estado = None, ""
         self._pantalla_inicio()
 
     def _salir(self):

@@ -22,6 +22,7 @@ $r.fabricante="$($cs.Manufacturer)".Trim()
 $r.modelo="$($cs.Model)".Trim()
 if($cs.Manufacturer -match 'LENOVO' -and $csp.Version){$r.modelo="$($csp.Version) ($($cs.Model))"}
 $r.serial="$($bios.SerialNumber)".Trim()
+$r.serial_producto="$($csp.IdentifyingNumber)".Trim()
 $r.bios="$($bios.SMBIOSBIOSVersion)".Trim()
 $r.cpu=(@(Get-CimInstance Win32_Processor | % { $_.Name.Trim() }) -join ' | ')
 $m=@(Get-CimInstance Win32_PhysicalMemory)
