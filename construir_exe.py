@@ -55,8 +55,20 @@ def main() -> int:
     if subprocess.run(cmd, cwd=SRC).returncode != 0:
         print("FALLA: Nuitka no pudo compilar (ver los mensajes de arriba).")
         return 1
-    shutil.copy2(os.path.join(BUILD, "PRUEBAS.exe"), os.path.join(APP_DIR, "PRUEBAS.exe"))
-    print("LISTO:", os.path.join(APP_DIR, "PRUEBAS.exe"))
+    destino = os.path.join(APP_DIR, "PRUEBAS.exe")
+    try:
+        shutil.copy2(os.path.join(BUILD, "PRUEBAS.exe"), destino)
+    except PermissionError:
+        # está abierto: Windows deja renombrar un .exe en uso, así que se aparta y se pone el nuevo
+        viejo = os.path.join(APP_DIR, "PRUEBAS_viejo.exe")
+        try:
+            os.remove(viejo)
+        except OSError:
+            viejo = os.path.join(APP_DIR, f"PRUEBAS_viejo_{os.getpid()}.exe")
+        os.rename(destino, viejo)
+        shutil.copy2(os.path.join(BUILD, "PRUEBAS.exe"), destino)
+        print(f"PRUEBAS.exe estaba abierto: la versión anterior quedó como {os.path.basename(viejo)}")
+    print("LISTO:", destino)
     return 0
 
 

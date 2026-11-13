@@ -110,6 +110,7 @@ class Paso:
     evidencia: list = field(default_factory=list)   # [(destino, segundos)] para la foto de un resultado automático
     todas: bool = False             # foto de todas las pantallas (HDMI)
     maximizar: bool = False
+    paginas: bool = False           # foto por página bajando con la rueda (HWMonitor: CPU arriba, GPU abajo)
     en_reporte: bool = True
 
 
@@ -350,6 +351,25 @@ class Barra:
     def info(self, txt: str):
         self.lbl_info.configure(text=txt)
         self._colocar()
+
+    def a_la_derecha(self, si: bool):
+        """Mueve la barra a la esquina inferior derecha (para no tapar las columnas de HWMonitor) y la regresa."""
+        if si:
+            self._pos_guardada = self.pos
+            self.top.update_idletasks()
+            ancho = min(self.ancho, int(self.top.winfo_screenwidth() * 0.38))
+            self.lbl_info.configure(wraplength=ancho - int(30 * self.app.escala))
+            self.marco_btn.pack_forget()
+            self.top.update_idletasks()
+            alto = self.top.winfo_reqheight()
+            x = self.top.winfo_screenwidth() - ancho - 8
+            y = self.top.winfo_screenheight() - alto - int(60 * self.app.escala)
+            self.top.geometry(f"{ancho}x{alto}+{x}+{y}")
+        else:
+            self.pos = getattr(self, "_pos_guardada", None)
+            self.lbl_info.configure(wraplength=self.ancho - int(30 * self.app.escala))
+            self._colocar()
+        self.top.update()
 
     def marcar(self, estado: str, txt: str = ""):
         color = COLOR.get(estado, "#0b5ed7")
@@ -729,8 +749,8 @@ class App:
                 P("estres_vram", "Estrés GPU memoria (OCCT)", "Prueba de VRAM sin errores.", "estres_vram"),
             ]
         pasos.append(P("temperatura", "Temperatura CPU/GPU", "Revisa la columna Max de HWMonitor "
-                       "(registró todo el recorrido).", "temperatura", tipo="revisar", ref="fondo_temp",
-                       maximizar=True))
+                       "(registró todo el recorrido). Al pulsar OK se toman fotos de CPU y, bajando, de la GPU.",
+                       "temperatura", tipo="revisar", ref="fondo_temp", maximizar=True, paginas=True))
         return pasos
 
     def _recorrido(self, solo: Paso | None = None):
@@ -843,9 +863,13 @@ class App:
         if d in ("OK", "FALLA"):
             self.ui(self.barra.marcar, d, ultimo if d == "OK" and ultimo else "")
             time.sleep(0.35)
-            f = self._foto(paso)
-            if f:
-                fotos.append(f)
+            vivas = [h for h in (foco or []) if win.existe(h)]
+            if paso.paginas and vivas:
+                fotos += self._fotos_paginas(paso, max(vivas, key=win.area))
+            else:
+                f = self._foto(paso)
+                if f:
+                    fotos.append(f)
         if d == "FALLA":
             self.ev_comentario.clear()
             self.ui(self.barra.pedir_comentario)
@@ -876,11 +900,45 @@ class App:
                 fotos.append(f)
         return fotos
 
-    def _foto(self, paso: Paso) -> str | None:
+    def _ruta_foto(self, paso: Paso) -> str:
         visibles = [p for p in self.pasos if p.en_reporte]
         n = visibles.index(paso) + 1 if paso in visibles else 0
         k = len([f for f in os.listdir(os.path.join(self.carpeta, "fotos")) if f.startswith(f"{n:02d}_{paso.id}_")])
-        rel = f"fotos/{n:02d}_{paso.id}_{k + 1}.jpg"
+        return f"fotos/{n:02d}_{paso.id}_{k + 1}.jpg"
+
+    def _fotos_paginas(self, paso: Paso, hwnd: int, maximo: int = 8) -> list[str]:
+        """Sube al inicio de la ventana y toma una foto por página bajando con la rueda, hasta que ya no baje."""
+        self.ui(self.barra.a_la_derecha, True)
+        try:
+            return self._fotos_paginas_(paso, hwnd, maximo)
+        finally:
+            self.ui(self.barra.a_la_derecha, False)
+
+    def _fotos_paginas_(self, paso: Paso, hwnd: int, maximo: int) -> list[str]:
+        from PIL import ImageChops
+        win.al_frente(hwnd)
+        win.rueda(hwnd, 60)  # al principio de la lista
+        fotos: list[str] = []
+        previa = None
+        for _ in range(maximo):
+            img = win.captura_imagen(paso.todas)
+            if img is None:
+                self.ui_async(self.barra.info, "⚠ No se pudo tomar la foto (¿pantalla bloqueada?). Usa FOTO EXTRA.")
+                break
+            x0, y0, x1, y1 = win.rect(hwnd)
+            caja = (max(0, x0), max(0, y0), min(img.width, x1), min(img.height, y1))
+            zona = img.crop(caja) if caja[2] > caja[0] and caja[3] > caja[1] else img
+            if previa is not None and ImageChops.difference(zona, previa).getbbox() is None:
+                break  # ya no baja más: la última foto ya muestra el final
+            rel = self._ruta_foto(paso)
+            img.save(os.path.join(self.carpeta, rel), "JPEG", quality=82, optimize=True)
+            fotos.append(rel)
+            previa = zona
+            win.rueda(hwnd, -8)  # menos de una página, para que las fotos se traslapen
+        return fotos
+
+    def _foto(self, paso: Paso) -> str | None:
+        rel = self._ruta_foto(paso)
         if win.capturar(os.path.join(self.carpeta, rel), paso.todas):
             return rel
         self.ui_async(self.barra.info, "⚠ No se pudo tomar la foto (¿pantalla bloqueada?). Usa FOTO EXTRA.")

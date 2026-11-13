@@ -294,6 +294,50 @@ def tipo_unidad(letra: str) -> int:
     return int(kernel32.GetDriveTypeW(f"{letra}:\\"))
 
 
+class _Punto(ctypes.Structure):
+    _fields_ = [("x", ctypes.c_long), ("y", ctypes.c_long)]
+
+
+user32.mouse_event.argtypes = [wt.DWORD, wt.DWORD, wt.DWORD, wt.DWORD, ctypes.c_size_t]
+user32.GetCursorPos.argtypes = [ctypes.POINTER(_Punto)]
+
+
+def rect(hwnd: int) -> tuple[int, int, int, int]:
+    r = wt.RECT()
+    user32.GetWindowRect(hwnd, ctypes.byref(r))
+    return r.left, r.top, r.right, r.bottom
+
+
+def rueda(hwnd: int, clics: int) -> None:
+    """
+    Desplaza la ventana con la rueda del mouse (clics > 0 sube, < 0 baja). Pone el puntero en el centro de la
+    ventana mientras tanto y luego lo devuelve a donde estaba.
+    """
+    r = wt.RECT()
+    user32.GetWindowRect(hwnd, ctypes.byref(r))
+    antes = _Punto()
+    user32.GetCursorPos(ctypes.byref(antes))
+    user32.SetCursorPos((r.left + r.right) // 2, (r.top + r.bottom) // 2)
+    time.sleep(0.05)
+    paso = 1 if clics > 0 else -1
+    for _ in range(abs(clics)):
+        user32.mouse_event(0x0800, 0, 0, (120 * paso) & 0xFFFFFFFF, 0)  # MOUSEEVENTF_WHEEL
+        time.sleep(0.02)
+    time.sleep(0.35)  # que termine de redibujar
+    user32.SetCursorPos(antes.x, antes.y)
+
+
+def captura_imagen(todas_las_pantallas: bool = False):
+    """La imagen de la pantalla (PIL) o None."""
+    from PIL import ImageGrab
+    for intento in range(3):
+        try:
+            return ImageGrab.grab(all_screens=todas_las_pantallas).convert("RGB")
+        except Exception:
+            time.sleep(0.6 * (intento + 1))
+    return None
+
+
 def capturar(ruta: str, todas_las_pantallas: bool = False) -> str | None:
     """Foto de la pantalla en JPG. Devuelve la ruta o None si falló."""
     global ultimo_error
