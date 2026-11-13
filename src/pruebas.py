@@ -30,7 +30,7 @@ import pagina_ui
 import reporte
 import ventanas as win
 
-VERSION = "22.3"
+VERSION = "22.4"
 
 if "__compiled__" in globals():
     BASE = os.path.dirname(os.path.abspath(sys.argv[0]))
@@ -781,6 +781,12 @@ class App:
                 messagebox.showinfo("PRUEBAS", "Esta orden no está enlazada con la página (o falta el PIN).",
                                     parent=self.root)
             return
+        if getattr(self, "enviando", False):
+            if manual:
+                messagebox.showinfo("PRUEBAS", "Ya se está enviando a la página: espera a que termine.",
+                                    parent=self.root)
+            return
+        self.enviando = True
         datos = self._datos_reporte()
         carpeta, orden, enlace, clave = self.carpeta, self.orden, dict(self.enlace), self.clave_pagina
         limite = pagina.limite_archivos(self.cfg.get("pagina") or {})
@@ -791,15 +797,23 @@ class App:
             self.ui_async(self._mostrar_envio)
 
         def hilo():
+            try:
+                enviar()
+            finally:
+                self.enviando = False
+
+        def enviar():
             estado("Preparando el envío a la página (reporte PDF y fotos)...")
             aida = os.path.isfile(os.path.join(carpeta, f"{orden}_AIDA.html"))
             resultados, origen = pagina.armar_resultados(datos["pasos"], enlace["lista"], aida)
             if not resultados:
                 estado("Ninguna prueba coincide con la lista de la orden: no se envió nada.")
                 return
-            html = os.path.join(carpeta, f"{orden}_CHECKLIST.html")
-            archivos = pagina.armar_archivos(carpeta, orden, origen, html, limite)
+            notas: list[str] = []
+            archivos = pagina.armar_archivos(carpeta, orden, origen, datos, limite,
+                                             pagina.ya_subidos(carpeta, enlace["tipo"]), notas)
             envio = pagina.nuevo_envio(carpeta, enlace, enlace["tipo"], pc, VERSION, resultados, archivos)
+            envio["notas"] = notas
             for espera in (0,) + pagina.REINTENTOS:
                 if espera:
                     estado(f"Sin respuesta de la página: se reintenta en {espera // 60 or espera}"
@@ -835,6 +849,8 @@ class App:
             lineas.append(f"   ignorado: {nombre}: {motivo}")
         for pos, motivo in ((envio.get("confirmacion") or {}).get("rechazados") or {}).items():
             lineas.append(f"   archivo rechazado #{pos}: {motivo}")
+        for nota in envio.get("notas") or []:
+            lineas.append(f"   no enviado: {nota}")
         try:
             with open(os.path.join(carpeta, "pagina_registro.txt"), "a", encoding="utf-8") as fh:
                 fh.write("\n".join(lineas) + "\n")
@@ -928,7 +944,7 @@ class App:
             P("jack", "Jack de audio (audífonos)", "Conecta audífonos y comprueba que se escuche por ellos.",
               "sonido"),
             P("carga", "Carga de batería", "Conecta el cargador. Se aprueba sola al detectar que carga.",
-              auto=self._auto_carga, poll=self._poll_carga),
+              auto=self._auto_carga, poll=self._poll_carga, evidencia=[("ms-settings:batterysaver", 2.0)]),
             P("red", "Puerto de red (cable)", "Conecta el cable de red. Se aprueba sola al detectar enlace.",
               auto=self._auto_red, poll=self._poll_red, evidencia=[("ms-settings:network-ethernet", 1.5)]),
             P("wifi", "Wi-Fi", "Conéctate a una red Wi-Fi. Se aprueba sola al tener internet.",
@@ -938,7 +954,7 @@ class App:
             P("hdmi", "Video HDMI/VGA", "Conecta un monitor por HDMI/VGA. Se aprueba sola al detectarlo.",
               auto=self._auto_hdmi, poll=self._poll_hdmi, todas=True),
             P("usb", "Puertos USB", "Conecta una memoria en cada puerto, uno por uno, y pulsa OK.",
-              auto=self._auto_usb, poll=self._poll_usb),
+              "shell:MyComputerFolder", auto=self._auto_usb, poll=self._poll_usb),   # 'Este equipo' para la foto
             P("dvd", "Unidad DVD/CD", "Inserta un disco y comprueba que se lea.", auto=self._auto_dvd),
             P("controladores", "Controladores", auto=self._auto_controladores,
               evidencia=[("devmgmt.msc", 1.5)]),
@@ -960,7 +976,8 @@ class App:
                 P("estres_vram", "Estrés GPU memoria (OCCT)", "Prueba de VRAM sin errores.", "estres_vram"),
             ]
         pasos.append(P("temperatura", "Temperatura CPU/GPU", "Revisa la columna Max de HWMonitor "
-                       "(registró todo el recorrido). Al pulsar OK se toman fotos de CPU y, bajando, de la GPU.",
+                       "(registró todo el recorrido). Al pulsar OK se dejan solo las temperaturas de CPU y GPU "
+                       "y se toma la foto.",
                        "temperatura", tipo="revisar", ref="fondo_temp", maximizar=True, paginas=True))
         return pasos
 
@@ -1002,6 +1019,7 @@ class App:
             return
 
         detalle, info = "", paso.texto
+        inicio = time.time()
         if paso.auto:
             estado, detalle = paso.auto()
             if estado:
@@ -1034,6 +1052,8 @@ class App:
             self.ui(self.touch.cerrar)
             self.touch = None
         win.cerrar_del_todo(hw, HERR)
+        if paso.id == "microfono":
+            self._borrar_grabaciones(inicio)
         if estado == "TERMINAR":
             self.cancelar = True
             return
@@ -1078,7 +1098,10 @@ class App:
             time.sleep(0.35)
             vivas = [h for h in (foco or []) if win.existe(h)]
             if paso.paginas and vivas:
-                fotos += self._fotos_paginas(paso, max(vivas, key=win.area))
+                h = max(vivas, key=win.area)
+                # HWMonitor: se dejan abiertas solo las temperaturas de CPU y GPU -> 1 foto (máx. 2)
+                compacto = paso.id == "temperatura" and win.solo_temperaturas(h)
+                fotos += self._fotos_paginas(paso, h, 2 if compacto else 3)
             else:
                 f = self._foto(paso)
                 if f:
@@ -1098,26 +1121,28 @@ class App:
             if not self._lanzar(destino):
                 continue
             nuevas = win.esperar_nuevas(antes, timeout=12)
-            if destino in AVISOS_AL_ABRIR:
-                # p. ej. Hard Disk Sentinel de evaluación: espera su cuenta regresiva y pulsa 'Close'
-                principales = win.esperar_sin_avisos(self._exes_de(destino), timeout=30)
+            if not self._es_de_windows(destino):
+                # herramienta portable (CrystalDiskInfo, Hard Disk Sentinel): se espera SU ventana, aunque tarde en
+                # salir o ya estuviera abierta, y se cierran sus avisos (cuenta regresiva de evaluación, 'Close')
+                principales = win.esperar_sin_avisos(self._exes_de(destino),
+                                                     timeout=30 if destino in AVISOS_AL_ABRIR else 25)
                 nuevas = list(dict.fromkeys(nuevas + principales))
-                visibles = [h for h in principales if win.existe(h)]
+                visibles = [h for h in principales if win.existe(h) and not win.es_aviso(h)]
             else:
                 visibles = nuevas
-            if visibles:
-                win.al_frente(max(visibles, key=win.area))
-            time.sleep(espera if visibles else 2.0)
+            if not visibles:
+                win.cerrar_del_todo(nuevas, HERR)
+                continue  # sin la ventana la foto sería del escritorio: no sirve
+            win.al_frente(max(visibles, key=win.area))
+            time.sleep(espera)
+            win.al_frente(max(visibles, key=win.area))
             f = self._foto(paso)
             if f:
                 fotos.append(f)
             win.cerrar_del_todo(nuevas, HERR)
             time.sleep(0.3)
-        if not fotos:
-            time.sleep(0.4)
-            f = self._foto(paso)
-            if f:
-                fotos.append(f)
+        # sin ventana que lo muestre (batería, Office...) no se toma foto: la del escritorio no demuestra nada; la
+        # batería va con su informe y lo demás con el detalle en el reporte
         return fotos
 
     def _ruta_foto(self, paso: Paso) -> str:
@@ -1164,8 +1189,45 @@ class App:
         self.ui_async(self.barra.info, "⚠ No se pudo tomar la foto (¿pantalla bloqueada?). Usa FOTO EXTRA.")
         return None
 
+    def _borrar_grabaciones(self, desde: float):
+        """
+        La prueba de micrófono (Moo0 VoiceRecorder) deja la grabación en el escritorio ('Comp Voice ....mp3').
+        Se borran solo los audios creados durante la prueba, en el escritorio, Documentos, Música y la carpeta del
+        grabador.
+        """
+        carpetas = {os.path.dirname(self._ruta("microfono"))}
+        for csidl in (0x10, 0x19, 0x05, 0x0D):   # escritorio, escritorio público, Documentos, Música
+            buf = ctypes.create_unicode_buffer(260)
+            if ctypes.windll.shell32.SHGetFolderPathW(None, csidl, None, 0, buf) == 0 and buf.value:
+                carpetas.add(buf.value)
+        time.sleep(1.0)   # que el grabador termine de escribir el archivo al cerrarse
+        for carpeta in carpetas:
+            try:
+                nombres = os.listdir(carpeta)
+            except OSError:
+                continue
+            for nombre in nombres:
+                ruta = os.path.join(carpeta, nombre)
+                if not nombre.lower().endswith((".mp3", ".wav", ".ogg", ".wma", ".m4a")):
+                    continue
+                try:
+                    if os.path.isfile(ruta) and os.path.getctime(ruta) >= desde - 2:
+                        os.remove(ruta)
+                except OSError:
+                    pass
+
+    @staticmethod
+    def _es_de_windows(destino: str) -> bool:
+        return destino.startswith(("ms-settings:", "microsoft.windows.camera:", "shell:")) or destino.endswith(".msc")
+
     def _lanzar(self, destino: str) -> bool:
-        if destino.startswith(("ms-settings:", "microsoft.windows.camera:")) or destino.endswith(".msc"):
+        if destino.startswith("shell:"):
+            try:
+                subprocess.Popen(["explorer.exe", destino])
+                return True
+            except OSError:
+                return False
+        if self._es_de_windows(destino):
             try:
                 os.startfile(destino)
                 return True

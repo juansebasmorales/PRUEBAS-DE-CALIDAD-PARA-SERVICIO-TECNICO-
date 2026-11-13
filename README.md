@@ -51,9 +51,11 @@ Con la página configurada, **INICIAR** pide el PIN (una vez por sesión) y busc
 equipo**. Si la encuentra, se confirma; si no (o con **Elegir otra orden**) sale la **lista de órdenes abiertas**
 de la empresa (primero las que están en pruebas) con número, estado, cliente, marca y modelo, serie y fecha de
 ingreso, y un buscador por número, nombre, marca, modelo, serie o QR del comprobante. Se elige si son pruebas de
-**entrada** o de **salida**. Al terminar el recorrido se envían solos los resultados, el **reporte PDF**, **todas
-las fotos** de cada prueba (primero las de las fallas; la página acepta 60 archivos por envío y el programa lee
-ese límite) y los informes de batería y AIDA64 en PDF (con las claves de producto tapadas). Si no hay internet queda en cola y se
+**entrada** o de **salida**. Al terminar el recorrido se envían solos los resultados, el **reporte del checklist
+en PDF (sin fotos)**, **todas las fotos** en su prueba (primero las de las fallas; la página acepta 60 archivos por
+envío y el programa lee ese límite) y los informes de batería (p12) y AIDA64 (p17) en PDF, con las claves de
+producto tapadas. Los PDF los arma el propio programa (no depende de Edge). Un reenvío no repite las fotos que la
+página ya tiene (`pagina_subidos.json`), y lo que no se pudo mandar queda anotado en `pagina_registro.txt`. Si no hay internet queda en cola y se
 reintenta con el mismo envío (no duplica). En la revisión está el botón **ENVIAR A LA PÁGINA** para mandarlo de
 nuevo. Cada envío queda anotado en `Informes\<orden>\pagina_registro.txt`.
 

@@ -450,3 +450,138 @@ def capturar(ruta: str, todas_las_pantallas: bool = False) -> str | None:
 
 
 ultimo_error = ""
+
+
+# ------------------------------------------------------------------ árbol de HWMonitor (SysTreeView32)
+_u = ctypes.WinDLL("user32", use_last_error=True)
+_u.SendMessageW.argtypes = [wt.HWND, wt.UINT, ctypes.c_size_t, ctypes.c_ssize_t]
+_u.SendMessageW.restype = ctypes.c_ssize_t
+_k = ctypes.WinDLL("kernel32", use_last_error=True)
+_k.OpenProcess.argtypes = [wt.DWORD, wt.BOOL, wt.DWORD]
+_k.OpenProcess.restype = wt.HANDLE
+_k.VirtualAllocEx.argtypes = [wt.HANDLE, ctypes.c_void_p, ctypes.c_size_t, wt.DWORD, wt.DWORD]
+_k.VirtualAllocEx.restype = ctypes.c_void_p
+_k.VirtualFreeEx.argtypes = [wt.HANDLE, ctypes.c_void_p, ctypes.c_size_t, wt.DWORD]
+_k.WriteProcessMemory.argtypes = [wt.HANDLE, ctypes.c_void_p, ctypes.c_void_p, ctypes.c_size_t,
+                                  ctypes.POINTER(ctypes.c_size_t)]
+_k.ReadProcessMemory.argtypes = [wt.HANDLE, ctypes.c_void_p, ctypes.c_void_p, ctypes.c_size_t,
+                                 ctypes.POINTER(ctypes.c_size_t)]
+_k.IsWow64Process.argtypes = [wt.HANDLE, ctypes.POINTER(wt.BOOL)]
+_k.CloseHandle.argtypes = [wt.HANDLE]
+
+TVM_EXPAND, TVM_GETNEXTITEM, TVM_SELECTITEM, TVM_GETITEMW = 0x1102, 0x110A, 0x110B, 0x113E
+TVGN_ROOT, TVGN_NEXT, TVGN_CHILD, TVGN_FIRSTVISIBLE = 0, 1, 4, 5
+TVE_COLLAPSE, TVE_EXPAND = 1, 2
+
+
+class _TVITEMW(ctypes.Structure):   # 64 bits
+    _fields_ = [("mask", wt.UINT), ("hItem", ctypes.c_void_p), ("state", wt.UINT), ("stateMask", wt.UINT),
+                ("pszText", ctypes.c_void_p), ("cchTextMax", ctypes.c_int), ("iImage", ctypes.c_int),
+                ("iSelectedImage", ctypes.c_int), ("cChildren", ctypes.c_int), ("lParam", ctypes.c_void_p)]
+
+
+def arbol_de(hwnd: int) -> int:
+    """El SysTreeView32 más grande de la ventana (0 si no tiene)."""
+    arboles = [h for h in _hijos(hwnd) if clase(h) == "SysTreeView32"]
+    return max(arboles, key=area) if arboles else 0
+
+
+class _LectorArbol:
+    """Lee los textos de un árbol de otro proceso (memoria prestada en ese proceso)."""
+
+    def __init__(self, tree: int):
+        self.tree = tree
+        pid = wt.DWORD()
+        user32.GetWindowThreadProcessId(tree, ctypes.byref(pid))
+        self.h = _k.OpenProcess(0x0008 | 0x0010 | 0x0020 | 0x0400, False, pid.value)  # VM_OP|READ|WRITE|QUERY
+        if not self.h:
+            raise OSError("no se pudo abrir el proceso")
+        wow = wt.BOOL()
+        _k.IsWow64Process(self.h, ctypes.byref(wow))
+        if wow.value or ctypes.sizeof(ctypes.c_void_p) != 8:
+            _k.CloseHandle(self.h)
+            raise OSError("proceso de 32 bits")
+        self.mem = _k.VirtualAllocEx(self.h, None, 4096, 0x3000, 0x04)  # MEM_COMMIT|RESERVE, PAGE_READWRITE
+        if not self.mem:
+            _k.CloseHandle(self.h)
+            raise OSError("sin memoria")
+
+    def texto(self, item: int) -> str:
+        it = _TVITEMW(mask=0x0001 | 0x0010, hItem=item, pszText=self.mem + 128, cchTextMax=900)
+        n = ctypes.c_size_t()
+        _k.WriteProcessMemory(self.h, self.mem, ctypes.byref(it), ctypes.sizeof(it), ctypes.byref(n))
+        if not _u.SendMessageW(self.tree, TVM_GETITEMW, 0, self.mem):
+            return ""
+        buf = ctypes.create_unicode_buffer(900)
+        _k.ReadProcessMemory(self.h, self.mem + 128, buf, 1800, ctypes.byref(n))
+        return buf.value
+
+    def cerrar(self):
+        _k.VirtualFreeEx(self.h, self.mem, 0, 0x8000)
+        _k.CloseHandle(self.h)
+
+
+def _hijos_arbol(tree: int, item: int) -> list[int]:
+    res, h = [], _u.SendMessageW(tree, TVM_GETNEXTITEM, TVGN_CHILD, item)
+    while h and len(res) < 500:
+        res.append(h)
+        h = _u.SendMessageW(tree, TVM_GETNEXTITEM, TVGN_NEXT, h)
+    return res
+
+
+import re as _re  # noqa: E402
+_CATEGORIA = _re.compile(r"^(temp|volt|power|potenc|clock|frec|util|fan|ventil|speed|veloc|capac|level|nivel|"
+                         r"current|corrient|wear|desgast|charge|carga)", _re.I)
+_TEMP = _re.compile(r"^temp", _re.I)
+_GPU = _re.compile(r"nvidia|geforce|quadro|radeon|graphics|gráficos|\brtx\b|\bgtx\b|\barc\b|\bmx\d{3}\b", _re.I)
+_CPU = _re.compile(r"\bcore\b|ryzen|athlon|celeron|pentium|xeon|atom|processor|\bcpu\b|\bapu\b|core\s?ultra|"
+                   r"i[3579]-\d|snapdragon", _re.I)
+
+
+def solo_temperaturas(hwnd: int) -> bool:
+    """
+    En HWMonitor deja abiertas solo las temperaturas del procesador y de la tarjeta de video y cierra lo demás,
+    para que quepan en una foto. False si no se pudo (y el árbol queda como estaba).
+    """
+    tree = arbol_de(hwnd)
+    if not tree:
+        return False
+    try:
+        lector = _LectorArbol(tree)
+    except OSError:
+        return False
+    try:
+        # equipos = nodos que tienen categorías (Temperatures, Voltages...) como hijos
+        equipos: list[tuple[int, str, list[tuple[int, str]]]] = []
+        pila = _hijos_arbol(tree, 0)   # raíces
+        vistos = 0
+        while pila and vistos < 400:
+            item = pila.pop(0)
+            vistos += 1
+            hijos = _hijos_arbol(tree, item)
+            if not hijos:
+                continue
+            textos = [(h, lector.texto(h)) for h in hijos]
+            if any(_CATEGORIA.match(t.strip()) for _h, t in textos):
+                equipos.append((item, lector.texto(item), textos))
+            else:
+                pila.extend(hijos)
+        if not equipos:
+            return False
+        quedan = [e for e in equipos if (_GPU.search(e[1]) or _CPU.search(e[1]))
+                  and any(_TEMP.match(t.strip()) for _h, t in e[2])]
+        if not quedan:
+            return False
+        for item, _nombre, categorias in equipos:
+            if not any(item == q[0] for q in quedan):
+                _u.SendMessageW(tree, TVM_EXPAND, TVE_COLLAPSE, item)
+                continue
+            _u.SendMessageW(tree, TVM_EXPAND, TVE_EXPAND, item)
+            for h, t in categorias:
+                _u.SendMessageW(tree, TVM_EXPAND, TVE_EXPAND if _TEMP.match(t.strip()) else TVE_COLLAPSE, h)
+        _u.SendMessageW(tree, TVM_SELECTITEM, TVGN_FIRSTVISIBLE, _hijos_arbol(tree, 0)[0])  # arriba del todo
+        user32.InvalidateRect(tree, None, True)
+        time.sleep(0.4)
+        return True
+    finally:
+        lector.cerrar()

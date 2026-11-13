@@ -10,15 +10,12 @@ from __future__ import annotations
 import json
 import os
 import re
-import shutil
-import subprocess
-import tempfile
+import threading
 import time
 import unicodedata
 import urllib.error
 import urllib.request
 import uuid
-from pathlib import Path
 
 API = os.environ.get("PRUEBAS_API_URL") or \
     "https://yuapwlriaercxrbzwvum.supabase.co/functions/v1/pagos/taller/api/pruebas"
@@ -26,7 +23,6 @@ PROGRAMA = "PRUEBAS"
 REINTENTOS = (30, 120, 600)          # segundos entre reintentos si no hay internet o el servidor no responde
 MAX_ARCHIVOS = 10
 MAX_BYTES = 15 * 1024 * 1024
-SIN_VENTANA = 0x08000000
 
 # prueba del programa -> (id en la página, nombre por defecto en la página)
 EQUIVALENCIAS = [
@@ -72,6 +68,8 @@ class ErrorPagina(Exception):
         return self.codigo in (0, 429, 500, 502, 503, 504)
 
     def para_tecnico(self) -> str:
+        if self.codigo == -1:
+            return "Ya se está enviando a la página: espera a que termine."
         if self.codigo == 401:
             return "La clave ya no sirve: pide una nueva al administrador."
         if self.codigo == 404:
@@ -248,37 +246,7 @@ def armar_resultados(pasos: list[dict], lista: list[dict], aida_existe: bool) ->
     return resultados, origen
 
 
-# ------------------------------------------------------------------------------------------- PDF
-def _navegador() -> str:
-    for base in (os.environ.get("ProgramFiles(x86)", r"C:\Program Files (x86)"),
-                 os.environ.get("ProgramFiles", r"C:\Program Files"), os.environ.get("LOCALAPPDATA", "")):
-        for rel in (r"Microsoft\Edge\Application\msedge.exe", r"Google\Chrome\Application\chrome.exe"):
-            ruta = os.path.join(base, rel)
-            if base and os.path.isfile(ruta):
-                return ruta
-    return ""
-
-
-def a_pdf(html: str, pdf: str) -> bool:
-    """HTML -> PDF con Edge (o Chrome) sin ventana. La página no acepta .html."""
-    nav = _navegador()
-    if not nav or not os.path.isfile(html):
-        return False
-    perfil = tempfile.mkdtemp(prefix="pruebas_pdf_")  # perfil aparte: no choca con el Edge que esté abierto
-    try:
-        if os.path.exists(pdf):
-            os.remove(pdf)
-        subprocess.run([nav, "--headless=new", "--disable-gpu", "--no-first-run", "--disable-extensions",
-                        "--no-sandbox", f"--user-data-dir={perfil}", "--no-pdf-header-footer",
-                        "--virtual-time-budget=5000", f"--print-to-pdf={pdf}", Path(html).resolve().as_uri()],
-                       capture_output=True, timeout=120, creationflags=SIN_VENTANA)
-        return os.path.isfile(pdf) and os.path.getsize(pdf) > 0
-    except (OSError, subprocess.TimeoutExpired):
-        return False
-    finally:
-        shutil.rmtree(perfil, ignore_errors=True)
-
-
+# ------------------------------------------------------------------------------------------- archivos
 _CLAVE_PRODUCTO = re.compile(r"\b[A-Z0-9]{5}(?:-[A-Z0-9]{5}){4}\b")
 _ID_PRODUCTO = re.compile(r"\b\d{5}-\d{5}-\d{5}-[A-Z0-9]{5}\b")
 
@@ -290,7 +258,7 @@ def tapar_claves(html: str) -> str:
 
 
 def _foto_liviana(origen: str, destino: str) -> str:
-    """Las fotos de las fallas se mandan reducidas (máx. 1600 px) para no pasar de 15 MB."""
+    """Las fotos se mandan reducidas (máx. 1600 px) para no pasar de 15 MB."""
     try:
         from PIL import Image
         with Image.open(origen) as img:
@@ -302,29 +270,48 @@ def _foto_liviana(origen: str, destino: str) -> str:
         return origen
 
 
-def armar_archivos(carpeta: str, orden: str, origen: dict, html_reporte: str,
-                   limite: int = MAX_ARCHIVOS) -> list[tuple[dict, str]]:
+def huella(ruta: str) -> str:
+    import hashlib
+    with open(ruta, "rb") as fh:
+        return hashlib.sha256(fh.read()).hexdigest()
+
+
+def armar_archivos(carpeta: str, orden: str, origen: dict, datos: dict, limite: int = MAX_ARCHIVOS,
+                   ya_subidos: set | None = None, notas: list | None = None) -> list[tuple[dict, str]]:
     """
     [(datos del archivo para 'enviar', ruta local)], por prioridad hasta 'limite' (lo que acepte la página):
-      1. el reporte PDF (lleva adentro TODAS las fotos, así llegan aunque no quepan sueltas),
-      2. una foto por cada prueba en falla (la página la exige),
-      3. los informes de batería y AIDA64 en PDF (con las claves de producto tapadas),
-      4. una foto de cada prueba OK/N/A, y después las fotos extra (p. ej. las páginas de HWMonitor).
+      1. el reporte del checklist en PDF, sin fotos (las fotos van sueltas en cada prueba),
+      2. las fotos de las pruebas en falla (la página exige al menos una),
+      3. los informes de batería (p12) y AIDA64 (p17) en PDF, con las claves de producto tapadas,
+      4. una foto de cada prueba OK/N/A, y después las demás fotos.
+    Lo que ya se subió a esta orden en un envío anterior ('ya_subidos', por huella) no se vuelve a mandar.
     """
+    import pdf_simple
+    from reporte import _leer_html
     salida = os.path.join(carpeta, "pagina")
     os.makedirs(salida, exist_ok=True)
     archivos: list[tuple[dict, str]] = []
-
+    ya = ya_subidos or set()
+    notas = notas if notas is not None else []
     try:
         max_bytes = int(float(LIMITES.get("mb_archivo") or 15) * 1024 * 1024)
     except (TypeError, ValueError):
         max_bytes = MAX_BYTES
 
     def agregar(meta: dict, ruta: str) -> bool:
-        if len(archivos) < limite and os.path.isfile(ruta) and 0 < os.path.getsize(ruta) <= max_bytes:
-            archivos.append(({**meta, "tam": os.path.getsize(ruta)}, ruta))
-            return True
-        return False
+        if not os.path.isfile(ruta) or os.path.getsize(ruta) == 0:
+            notas.append(f"{meta['nombre']}: no se pudo crear")
+            return False
+        if os.path.getsize(ruta) > max_bytes:
+            notas.append(f"{meta['nombre']}: pesa más de {max_bytes // 1048576} MB, no se envía")
+            return False
+        if not meta.get("reporte") and huella(ruta) in ya:
+            return False   # ya está en la orden desde un envío anterior
+        if len(archivos) >= limite:
+            notas.append(f"{meta['nombre']}: no cupo (máximo {limite} archivos por envío)")
+            return False
+        archivos.append(({**meta, "tam": os.path.getsize(ruta)}, ruta))
+        return True
 
     def foto(pid: str, rel: str, k: int, falla: bool):
         liviana = _foto_liviana(os.path.join(carpeta, rel.replace("/", os.sep)),
@@ -332,35 +319,41 @@ def armar_archivos(carpeta: str, orden: str, origen: dict, html_reporte: str,
         agregar({"nombre": os.path.basename(liviana), "tipo": "image/jpeg", "prueba": pid}, liviana)
 
     pdf = os.path.join(salida, f"reporte-{orden}.pdf")
-    if a_pdf(html_reporte, pdf):
-        agregar({"nombre": os.path.basename(pdf), "tipo": "application/pdf", "reporte": True}, pdf)
+    try:
+        pdf_simple.checklist_pdf(datos, pdf)
+    except Exception as exc:  # noqa: BLE001
+        notas.append(f"reporte PDF: {type(exc).__name__}: {exc}")
+    agregar({"nombre": os.path.basename(pdf), "tipo": "application/pdf", "reporte": True}, pdf)
 
     for pid, paso in origen.items():
-        if paso.get("estado") == "FALLA" and paso.get("fotos"):
-            foto(pid, paso["fotos"][0], 1, True)
+        if paso.get("estado") == "FALLA":
+            for k, rel in enumerate(paso.get("fotos", []), 1):
+                foto(pid, rel, k, True)
 
-    for pid, nombre_html, nombre_pdf in (("p12", f"{orden}_BATERIA.html", "informe-bateria.pdf"),
-                                         ("p17", f"{orden}_AIDA.html", "informe-aida64.pdf")):
-        if pid not in origen or len(archivos) >= limite:
+    for pid, nombre_html, nombre_pdf, titulo in (
+            ("p12", f"{orden}_BATERIA.html", "informe-bateria.pdf", "Informe de batería (powercfg)"),
+            ("p17", f"{orden}_AIDA.html", "informe-aida64.pdf", "Informe AIDA64")):
+        if pid not in origen:
             continue
         html = os.path.join(carpeta, nombre_html)
         if not os.path.isfile(html):
+            notas.append(f"{nombre_pdf}: no existe {nombre_html}")
             continue
-        tapado = os.path.join(salida, "tmp_" + nombre_html)
-        from reporte import _leer_html
-        with open(tapado, "w", encoding="utf-8") as fh:
-            fh.write(tapar_claves(_leer_html(html)))
         destino = os.path.join(salida, nombre_pdf)
-        if a_pdf(tapado, destino):
-            agregar({"nombre": nombre_pdf, "tipo": "application/pdf", "prueba": pid}, destino)
-        os.remove(tapado)
+        try:
+            pdf_simple.informe_pdf(f"{titulo} - {orden}", tapar_claves(_leer_html(html)), destino)
+        except Exception as exc:  # noqa: BLE001
+            notas.append(f"{nombre_pdf}: {type(exc).__name__}: {exc}")
+            continue
+        agregar({"nombre": nombre_pdf, "tipo": "application/pdf", "prueba": pid}, destino)
 
     for pid, paso in origen.items():  # primera foto de las demás pruebas
         if paso.get("estado") != "FALLA" and paso.get("fotos"):
             foto(pid, paso["fotos"][0], 1, False)
     for pid, paso in origen.items():  # el resto de fotos
-        for k, rel in enumerate(paso.get("fotos", [])[1:], 2):
-            foto(pid, rel, k, paso.get("estado") == "FALLA")
+        if paso.get("estado") != "FALLA":
+            for k, rel in enumerate(paso.get("fotos", [])[1:], 2):
+                foto(pid, rel, k, False)
     return archivos
 
 
@@ -417,6 +410,50 @@ def ejecutar_envio(clave: str, carpeta: str, envio: dict, aviso=lambda txt: None
     enviar -> PUT de cada archivo -> confirmar. Si falla por red, lanza ErrorPagina con reintentar=True y el
     envío queda guardado: se reintenta con el MISMO envio_id (la página no duplica).
     """
+    with _CANDADO:   # el envío automático, el botón y los reintentos no pueden mandar lo mismo a la vez
+        if envio["envio_id"] in _EN_CURSO:
+            raise ErrorPagina(-1, "Ese envío ya se está mandando")
+        _EN_CURSO.add(envio["envio_id"])
+    try:
+        return _ejecutar_envio(clave, carpeta, envio, aviso)
+    finally:
+        with _CANDADO:
+            _EN_CURSO.discard(envio["envio_id"])
+
+
+_CANDADO = threading.Lock()
+_EN_CURSO: set[str] = set()
+
+
+def ruta_subidos(carpeta: str) -> str:
+    return os.path.join(carpeta, "pagina_subidos.json")
+
+
+def ya_subidos(carpeta: str, tipo: str) -> set[str]:
+    """Huellas de los archivos que la página ya guardó en esta orden (para no mandarlos otra vez)."""
+    try:
+        with open(ruta_subidos(carpeta), encoding="utf-8") as fh:
+            return set(json.load(fh).get(tipo, []))
+    except (OSError, ValueError, AttributeError):
+        return set()
+
+
+def _anotar_subidos(carpeta: str, envio: dict, rechazados: dict) -> None:
+    try:
+        with open(ruta_subidos(carpeta), encoding="utf-8") as fh:
+            todo = json.load(fh)
+    except (OSError, ValueError):
+        todo = {}
+    lista = set(todo.get(envio["tipo"], []))
+    for i, ruta in enumerate(envio.get("rutas", [])):
+        if str(i) not in rechazados and not envio["archivos"][i].get("reporte") and os.path.isfile(ruta):
+            lista.add(huella(ruta))
+    todo[envio["tipo"]] = sorted(lista)
+    with open(ruta_subidos(carpeta), "w", encoding="utf-8") as fh:
+        json.dump(todo, fh)
+
+
+def _ejecutar_envio(clave: str, carpeta: str, envio: dict, aviso) -> dict:
     campos = {k: envio[k] for k in ("orden_id", "envio_id", "tipo", "pc", "programa", "version", "resultados",
                                     "archivos")}
     envio["intentos"] = envio.get("intentos", 0) + 1
@@ -453,6 +490,10 @@ def ejecutar_envio(clave: str, carpeta: str, envio: dict, aviso=lambda txt: None
     envio["estado"] = "confirmado"
     envio["confirmacion"] = {k: conf.get(k) for k in ("guardados", "rechazados", "faltan_evidencia")}
     guardar_envio(carpeta, envio)
+    try:
+        _anotar_subidos(carpeta, envio, conf.get("rechazados") or {})
+    except OSError:
+        pass
     return envio
 
 
