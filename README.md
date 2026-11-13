@@ -64,6 +64,13 @@ cambiaron** (comprueba cada uno con SHA-256). No toca `Informes`, `config.json` 
 está abierto, el anterior queda como `PRUEBAS.exe.viejo`. La primera vez revisa todo (1-2 minutos); después tarda
 unos segundos.
 
+### Actualizar una memoria USB desde un PC
+
+Con la memoria conectada, doble clic en **`ACTUALIZAR_USB.bat`** (se puede bajar de la carpeta de Drive y dejar
+en el escritorio). Busca las memorias conectadas y la carpeta de PRUEBAS que tengan (en la raíz o un nivel adentro;
+si no hay, crea `PRUEBASv2`), y baja de Drive **solo lo que falta o es diferente**, igual que `ACTUALIZAR.bat`. Si
+hay varias memorias, pregunta cuál. También se puede arrastrar una carpeta encima del .bat para actualizar esa.
+
 ## Compilar y publicar (solo en el PC de desarrollo)
 
 ```

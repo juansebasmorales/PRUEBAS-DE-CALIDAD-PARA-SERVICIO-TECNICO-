@@ -26,7 +26,7 @@ $ProgressPreference = 'SilentlyContinue'   # sin esto Invoke-WebRequest es lenti
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 
 $CARPETA_DRIVE = '1fejlqjQvjjj25r3wRuCCRbNJX2Ad-c74'   # carpeta publica PRUEBASv2
-$base = Split-Path -Parent $env:ACT_BAT
+$base = if ($env:ACT_DESTINO) { $env:ACT_DESTINO } else { Split-Path -Parent $env:ACT_BAT }   # ACT_DESTINO: lo usa ACTUALIZAR_USB.bat
 $rutaCache = Join-Path $base '.actualizacion_cache.json'
 $listados = @{}
 
@@ -84,6 +84,7 @@ try {
     $bytes = 0
     foreach ($p in $remoto.archivos.PSObject.Properties) {
         $rel = $p.Name; $info = $p.Value
+        if ($rel -eq 'ACTUALIZAR_USB.bat') { continue }   # ese se usa desde el PC, no hace falta en la memoria
         $ruta = Join-Path $base ($rel -replace '/', '\')
         $h = $null
         if (Test-Path -LiteralPath $ruta) {
@@ -117,7 +118,7 @@ try {
             try {
                 Descargar $id $tmp
                 if ((Hash $tmp) -ne $info.sha256) { throw 'el archivo descargado no coincide (descarga incompleta)' }
-                if ($rel -eq 'ACTUALIZAR.bat') {
+                if ($rel -eq 'ACTUALIZAR.bat' -and -not $env:ACT_DESTINO) {
                     Move-Item -LiteralPath $tmp -Destination (Join-Path $base 'ACTUALIZAR.nuevo') -Force   # lo reemplaza el .bat al salir
                 } else {
                     try { Move-Item -LiteralPath $tmp -Destination $ruta -Force }
