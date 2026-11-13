@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import base64
 import json
 import os
+import re
 from html import escape
 
 ESTILO = {"OK": ("#d4edda", "#155724"), "FALLA": ("#f8d7da", "#721c24"), "N/A": ("#d1ecf1", "#0c5460"),
@@ -109,3 +111,84 @@ def generar(carpeta: str, datos: dict) -> str:
     with open(os.path.join(carpeta, "resultado.json"), "w", encoding="utf-8") as fh:
         json.dump(datos, fh, ensure_ascii=False, indent=2)
     return ruta
+
+
+def _leer_html(ruta: str) -> str:
+    """HTML de otro programa en el texto correcto (powercfg usa UTF-8/UTF-16, AIDA64 suele usar ANSI)."""
+    with open(ruta, "rb") as fh:
+        crudo = fh.read()
+    if crudo[:2] in (b"\xff\xfe", b"\xfe\xff"):
+        return crudo.decode("utf-16", errors="replace")
+    try:
+        return crudo.decode("utf-8-sig")
+    except UnicodeDecodeError:
+        return crudo.decode("cp1252", errors="replace")
+
+
+def _incrustar_fotos(html: str, carpeta: str) -> str:
+    """Cambia fotos/xxx.jpg por la imagen dentro del HTML (data:), para que el archivo funcione solo."""
+    cache: dict[str, str] = {}
+
+    def data(rel: str) -> str:
+        if rel not in cache:
+            try:
+                with open(os.path.join(carpeta, rel), "rb") as fh:
+                    cache[rel] = "data:image/jpeg;base64," + base64.b64encode(fh.read()).decode("ascii")
+            except OSError:
+                cache[rel] = rel
+        return cache[rel]
+
+    # el enlace a la foto grande duplicaría el peso: se quita y la foto se amplía con un clic
+    html = re.sub(r"<a href='(fotos/[^']+)' target='_blank'>(<img [^>]*>)</a>", r"\2", html)
+    return re.sub(r"src='(fotos/[^']+)'", lambda m: f"src='{data(m.group(1))}'", html)
+
+
+AMPLIAR = ("<script>document.querySelectorAll('img').forEach(function(i){i.style.cursor='zoom-in';"
+           "i.onclick=function(){var w=window.open('');w.document.write('<title>Foto</title><body style=\"margin:0;"
+           "background:#111\"><img src=\"'+i.src+'\" style=\"max-width:100%;display:block;margin:auto\">');};});"
+           "</script>")
+
+
+def unir(carpeta: str, orden: str) -> str | None:
+    """
+    Junta checklist + informe de batería + AIDA64 en <orden>_REPORTE_COMPLETO.html: un solo archivo con pestañas
+    y las fotos adentro (para enviarlo o subirlo sin perder nada). None si no hay checklist todavía.
+    """
+    partes = []
+    for nombre, archivo in (("Checklist", f"{orden}_CHECKLIST.html"), ("Batería", f"{orden}_BATERIA.html"),
+                            ("AIDA64", f"{orden}_AIDA.html")):
+        ruta = os.path.join(carpeta, archivo)
+        if not os.path.isfile(ruta):
+            continue
+        try:
+            html = _leer_html(ruta)
+        except OSError:
+            continue
+        if nombre == "Checklist":
+            html = _incrustar_fotos(html, carpeta).replace("</body>", AMPLIAR + "</body>")
+        partes.append((nombre, html))
+    if not partes or partes[0][0] != "Checklist":
+        return None
+
+    botones = "".join(f"<button onclick='ver({i})' id='b{i}'>{escape(n)}</button>" for i, (n, _h) in enumerate(partes))
+    marcos = "".join(f"<iframe id='f{i}' srcdoc=\"{escape(h, quote=True)}\"></iframe>" for i, (_n, h) in enumerate(partes))
+    pagina = f"""<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Reporte completo {escape(orden)}</title><style>
+*{{box-sizing:border-box}}body{{margin:0;font-family:'Segoe UI',Tahoma,sans-serif;background:#f4f5f7}}
+nav{{position:sticky;top:0;z-index:2;display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:10px 16px;background:#1f2430}}
+nav b{{color:#fff;margin-right:12px;font-size:15px}}
+nav button{{border:0;border-radius:6px;padding:8px 16px;font:600 14px 'Segoe UI',sans-serif;background:#3c4454;color:#fff;cursor:pointer}}
+nav button.activo{{background:#0b5ed7}}
+iframe{{display:none;width:100%;height:calc(100vh - 56px);border:0;background:#fff}}iframe.activo{{display:block}}
+@media print{{nav{{display:none}}iframe{{height:auto;min-height:100vh}}}}
+</style></head><body>
+<nav><b>Orden {escape(orden)}</b>{botones}<button onclick="document.getElementById('f'+actual).contentWindow.print()">Imprimir pestaña</button></nav>
+{marcos}
+<script>var actual=0;function ver(i){{document.querySelectorAll('iframe,nav button[id]').forEach(function(e){{e.classList.remove('activo')}});
+document.getElementById('f'+i).classList.add('activo');document.getElementById('b'+i).classList.add('activo');actual=i;}}ver(0);</script>
+</body></html>"""
+    salida = os.path.join(carpeta, f"{orden}_REPORTE_COMPLETO.html")
+    with open(salida, "w", encoding="utf-8") as fh:
+        fh.write(pagina)
+    return salida

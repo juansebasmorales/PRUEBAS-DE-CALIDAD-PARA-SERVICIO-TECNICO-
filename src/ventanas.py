@@ -158,47 +158,142 @@ def _hijos(hwnd: int) -> list[int]:
     return res
 
 
-# Botones que se pueden pulsar solos en un aviso, por orden de preferencia. Nunca 'actualizar', 'descargar' ni 'sí'.
+# Botones que se pueden pulsar solos en un aviso, por orden de preferencia. Nunca 'actualizar', 'descargar',
+# 'registrar' ni 'sí'.
 CONTINUAR = ("continue", "continuar", "later", "más tarde", "mas tarde", "remind me later", "no", "cancel",
              "cancelar", "close", "cerrar", "ok", "aceptar")
-NUNCA = ("update", "actualizar", "download", "descargar", "yes", "sí", "si", "install", "instalar", "buy", "comprar")
+NUNCA_EXACTO = ("yes", "sí", "si")
+NUNCA_CONTIENE = ("update", "actualiz", "download", "descarg", "install", "registr", "buy", "compra", "order",
+                  "purchase", "upgrade")
+
+user32.IsWindowEnabled.argtypes = [wt.HWND]
+
+
+def _texto(h: int) -> str:
+    n = user32.GetWindowTextLengthW(h)
+    buf = ctypes.create_unicode_buffer(n + 1)
+    user32.GetWindowTextW(h, buf, n + 1)
+    return buf.value
+
+
+def _botones(hwnd: int) -> dict[str, int]:
+    """{texto en minúsculas sin '&': hwnd} de los botones de la ventana (Win32 'Button' y Delphi 'TButton'...)."""
+    res = {}
+    for h in _hijos(hwnd):
+        if "button" not in clase(h).lower():
+            continue
+        txt = _texto(h).replace("&", "").strip().lower()
+        if txt:
+            res[txt] = h
+    return res
+
+
+def es_aviso(hwnd: int) -> bool:
+    """Cuadro de diálogo, o ventana de evaluación/registro (p. ej. 'Enter Registration Key' + 'Close')."""
+    return es_dialogo(hwnd) or any("registr" in t for t in _botones(hwnd))
 
 
 def pulsar_continuar(hwnd: int) -> str:
-    """Pulsa el botón 'Continuar' (o el más inofensivo) de un cuadro de diálogo. Devuelve el texto pulsado o ''."""
-    botones = {}
-    for h in _hijos(hwnd):
-        if clase(h).lower() != "button":
-            continue
-        n = user32.GetWindowTextLengthW(h)
-        buf = ctypes.create_unicode_buffer(n + 1)
-        user32.GetWindowTextW(h, buf, n + 1)
-        txt = buf.value.replace("&", "").strip().lower()
-        if txt and not any(txt == x or txt.startswith(x + " ") for x in NUNCA):
-            botones[txt] = h
+    """
+    Pulsa 'Continuar' (o el botón más inofensivo) de un aviso. Devuelve el texto pulsado, '' si no hay ninguno
+    permitido, o 'espera' si el botón todavía está desactivado (cuenta regresiva).
+    """
+    permitidos = {t: h for t, h in _botones(hwnd).items()
+                  if t not in NUNCA_EXACTO and not any(x in t for x in NUNCA_CONTIENE)}
     for objetivo in CONTINUAR:
-        if objetivo in botones:
-            user32.PostMessageW(botones[objetivo], 0x00F5, 0, 0)  # BM_CLICK
+        h = permitidos.get(objetivo)
+        if h:
+            if not user32.IsWindowEnabled(h):
+                return "espera"
+            user32.PostMessageW(h, 0x00F5, 0, 0)  # BM_CLICK
             return objetivo
     return ""
 
 
 def auto_continuar(exes: set[str], segundos: float = 30.0) -> list[str]:
-    """Durante 'segundos', pulsa 'Continuar' en los avisos (#32770) que abran esos programas."""
+    """Durante 'segundos', pulsa 'Continuar' / 'Close' en los avisos que abran esos programas."""
     vistos: set[int] = set()
     pulsados: list[str] = []
     fin = time.time() + segundos
     while time.time() < fin:
         for h in list(ventanas()):
-            if h in vistos or not es_dialogo(h) or exe_de(h) not in exes:
+            if h in vistos or exe_de(h) not in exes or not es_aviso(h):
                 continue
             time.sleep(0.4)  # que termine de crear sus botones
             txt = pulsar_continuar(h)
-            if txt:
+            if txt and txt != "espera":
                 vistos.add(h)
                 pulsados.append(txt)
         time.sleep(0.4)
     return pulsados
+
+
+def esperar_sin_avisos(exes: set[str], timeout: float = 30.0) -> list[int]:
+    """
+    Cierra con 'Continuar'/'Close' los avisos de esos programas (esperando su cuenta regresiva) y devuelve sus
+    ventanas principales cuando ya no queda ningún aviso.
+    """
+    fin = time.time() + timeout
+    while time.time() < fin:
+        propias = [h for h in ventanas() if exe_de(h) in exes]
+        avisos = [h for h in propias if es_aviso(h)]
+        for h in avisos:
+            pulsar_continuar(h)
+        principales = [h for h in propias if h not in avisos]
+        if principales and not avisos:
+            return principales
+        time.sleep(0.5)
+    return [h for h in ventanas() if exe_de(h) in exes]
+
+
+def ruta_exe_de(hwnd: int) -> str:
+    """Ruta completa del .exe dueño de la ventana ('' si no se puede leer)."""
+    pid = wt.DWORD()
+    user32.GetWindowThreadProcessId(hwnd, ctypes.byref(pid))
+    h = kernel32.OpenProcess(0x1000, False, pid.value)
+    if not h:
+        return ""
+    try:
+        buf = ctypes.create_unicode_buffer(1024)
+        n = wt.DWORD(1024)
+        return buf.value if kernel32.QueryFullProcessImageNameW(h, 0, buf, ctypes.byref(n)) else ""
+    finally:
+        kernel32.CloseHandle(h)
+
+
+def pid_de(hwnd: int) -> int:
+    pid = wt.DWORD()
+    user32.GetWindowThreadProcessId(hwnd, ctypes.byref(pid))
+    return pid.value
+
+
+def cerrar_del_todo(hwnds, carpeta_herramientas: str, espera: float = 2.0) -> None:
+    """
+    Cierra las ventanas (WM_CLOSE) y, si el programa sigue vivo (p. ej. se fue a la bandeja como Hard Disk
+    Sentinel), termina su proceso. Solo termina programas de la carpeta de herramientas: nunca Windows ni apps.
+    """
+    hwnds = [h for h in (hwnds or []) if existe(h)]
+    procesos = {}
+    base = os.path.normcase(os.path.abspath(carpeta_herramientas))
+    for h in hwnds:
+        ruta = ruta_exe_de(h)
+        if ruta and os.path.normcase(ruta).startswith(base):
+            procesos[pid_de(h)] = ruta
+    cerrar(hwnds)
+    if not procesos:
+        return
+    time.sleep(espera)
+    import subprocess
+    for pid in procesos:
+        h = kernel32.OpenProcess(0x1000, False, pid)
+        if not h:
+            continue  # ya terminó
+        codigo = wt.DWORD()
+        kernel32.GetExitCodeProcess(h, ctypes.byref(codigo))
+        kernel32.CloseHandle(h)
+        if codigo.value != 259:  # STILL_ACTIVE
+            continue
+        subprocess.run(["taskkill", "/PID", str(pid), "/T", "/F"], capture_output=True, creationflags=0x08000000)
 
 
 def minimizar(hwnd: int) -> None:

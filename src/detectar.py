@@ -299,7 +299,11 @@ def crystaldiskinfo(exe: str, timeout: int = 60) -> list[dict]:
     try:
         if os.path.exists(txt):
             os.remove(txt)
-        subprocess.run([exe, "/CopyExit"], cwd=carpeta, timeout=timeout, creationflags=SIN_VENTANA)
+        # oculto: si no, su ventana aparece al abrir PRUEBAS y parece que CrystalDiskInfo se abre dos veces
+        oculto = subprocess.STARTUPINFO()
+        oculto.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+        oculto.wShowWindow = 0  # SW_HIDE
+        subprocess.run([exe, "/CopyExit"], cwd=carpeta, timeout=timeout, startupinfo=oculto)
     except (OSError, subprocess.TimeoutExpired):
         return []
     try:

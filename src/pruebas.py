@@ -61,6 +61,8 @@ CONFIG_DEF = {
 }
 
 HWMONITOR_EXES = {"hwmonitor_x64.exe", "hwmonitor_x32.exe", "hwmonitorportable.exe", "hwmonitor.exe"}
+# herramientas que muestran un aviso al abrir (evaluación, actualización) que se cierra solo antes de la foto
+AVISOS_AL_ABRIR = {"hdsentinel"}
 ESTADOS = ("OK", "FALLA", "N/A")
 COLOR = {"OK": "#1e8e3e", "FALLA": "#d93025", "N/A": "#5f6c7b", "": "#b06000"}
 
@@ -513,7 +515,27 @@ class App:
     def _ruta(self, clave: str) -> str:
         val = self.cfg["herramientas"].get(clave) or [""]
         r = val[0]
-        return r if os.path.isabs(r) or not r else os.path.join(HERR, r)
+        r = r if os.path.isabs(r) or not r else os.path.join(HERR, r)
+        if clave == "hdtune" and r:
+            # el lanzador portable necesita App\AppInfo\Launcher\HD Tune Pro.ini; si se perdió al copiar la USB,
+            # se abre el programa directamente
+            carpeta = os.path.dirname(r)
+            ini = os.path.join(carpeta, "App", "AppInfo", "Launcher", "HD Tune Pro.ini")
+            directo = os.path.join(carpeta, "App", "HD Tune Pro", "HDTunePro.exe")
+            if not os.path.isfile(ini) and os.path.isfile(directo):
+                return directo
+        return r
+
+    def _exes_de(self, clave: str) -> set[str]:
+        """Nombres de todos los .exe de la carpeta de una herramienta (el lanzador y el programa real)."""
+        ruta = self._ruta(clave)
+        carpeta = os.path.dirname(ruta)
+        while os.path.dirname(carpeta) != HERR and os.path.dirname(carpeta) != carpeta:
+            carpeta = os.path.dirname(carpeta)  # sube hasta ProgramData\<herramienta>
+        res = set()
+        for raiz, _dirs, archivos in os.walk(carpeta):
+            res.update(a.lower() for a in archivos if a.lower().endswith(".exe"))
+        return res
 
     def _args(self, clave: str) -> list[str]:
         return list((self.cfg["herramientas"].get(clave) or [""])[1:])
@@ -763,7 +785,7 @@ class App:
             self.ui_async(self._marcar_actual, paso.id)
             self._ejecutar(paso)
         for hwnds in self.largas.values():
-            win.cerrar(hwnds)
+            win.cerrar_del_todo(hwnds, HERR)
         self.largas = {}
         self._guardar_estado()
         self.ui(self._generar_reporte, False)
@@ -820,7 +842,7 @@ class App:
         if paso.id == "touchpad" and self.touch:
             self.ui(self.touch.cerrar)
             self.touch = None
-        win.cerrar(hw)
+        win.cerrar_del_todo(hw, HERR)
         if estado == "TERMINAR":
             self.cancelar = True
             return
@@ -885,13 +907,20 @@ class App:
             if not self._lanzar(destino):
                 continue
             nuevas = win.esperar_nuevas(antes, timeout=12)
-            if nuevas:
-                win.al_frente(max(nuevas, key=win.area))
-            time.sleep(espera if nuevas else 2.0)
+            if destino in AVISOS_AL_ABRIR:
+                # p. ej. Hard Disk Sentinel de evaluación: espera su cuenta regresiva y pulsa 'Close'
+                principales = win.esperar_sin_avisos(self._exes_de(destino), timeout=30)
+                nuevas = list(dict.fromkeys(nuevas + principales))
+                visibles = [h for h in principales if win.existe(h)]
+            else:
+                visibles = nuevas
+            if visibles:
+                win.al_frente(max(visibles, key=win.area))
+            time.sleep(espera if visibles else 2.0)
             f = self._foto(paso)
             if f:
                 fotos.append(f)
-            win.cerrar(nuevas)
+            win.cerrar_del_todo(nuevas, HERR)
             time.sleep(0.3)
         if not fotos:
             time.sleep(0.4)
@@ -1195,12 +1224,25 @@ class App:
         self.tabla.bind("<Double-1>", lambda e: self._editar_comentario())
         self.botonera = tk.Frame(c, bg="#f4f5f7")
         self.botonera.pack(fill="x")
+        self.fila_reportes = tk.Frame(c, bg="#f4f5f7")
+        self.fila_reportes.pack(fill="x", pady=(8, 0))
         self._refrescar_tabla()
         self._botones_revision(en_curso)
 
     def _botones_revision(self, en_curso: bool):
-        for w in self.botonera.winfo_children():
+        for w in self.botonera.winfo_children() + self.fila_reportes.winfo_children():
             w.destroy()
+        if not en_curso:
+            tk.Label(self.fila_reportes, text="Reportes:", font=("Segoe UI", 10, "bold"),
+                     bg="#f4f5f7").pack(side="left", padx=(0, 8))
+            for texto, sufijo in (("Checklist", "CHECKLIST"), ("Batería", "BATERIA"), ("AIDA64", "AIDA")):
+                tk.Button(self.fila_reportes, text=texto, font=("Segoe UI", 10), relief="flat", bg="#e3e6ea",
+                          padx=10, command=lambda s=sufijo: self._abrir_reporte(s)).pack(side="left", padx=(0, 6))
+            tk.Button(self.fila_reportes, text="Abrir carpeta", font=("Segoe UI", 10), relief="flat", bg="#e3e6ea",
+                      padx=10, command=lambda: os.startfile(self.carpeta)).pack(side="left", padx=(0, 6))
+            tk.Button(self.fila_reportes, text="UNIR REPORTES (un solo archivo)", font=("Segoe UI", 10, "bold"),
+                      relief="flat", bg="#6f42c1", fg="white", padx=12,
+                      command=self._unir_reportes).pack(side="left", padx=(6, 0))
         if en_curso:
             tk.Button(self.botonera, text="Detener recorrido", font=("Segoe UI", 10), relief="flat", bg="#e3e6ea",
                       padx=10, command=lambda: self.decidir("TERMINAR")).pack(side="left")
@@ -1318,8 +1360,36 @@ class App:
                 "adjuntos": [("Informe de batería", f"{self.orden}_BATERIA.html"),
                              ("Informe AIDA64", f"{self.orden}_AIDA.html")]}
 
+    def _abrir_reporte(self, sufijo: str):
+        ruta = os.path.join(self.carpeta, f"{self.orden}_{sufijo}.html")
+        if sufijo == "CHECKLIST":
+            ruta = self._generar_reporte(False)
+        if os.path.isfile(ruta):
+            os.startfile(ruta)
+        elif sufijo == "AIDA":
+            messagebox.showinfo("PRUEBAS", "El informe de AIDA64 todavía no está (tarda 1-2 minutos en segundo "
+                                "plano) o AIDA64 no está en ProgramData.", parent=self.root)
+        else:
+            messagebox.showinfo("PRUEBAS", f"No se encontró {os.path.basename(ruta)}.", parent=self.root)
+
+    def _unir_reportes(self):
+        self._generar_reporte(False)
+        ruta = reporte.unir(self.carpeta, self.orden)
+        if not ruta:
+            messagebox.showinfo("PRUEBAS", "Todavía no hay checklist para unir.", parent=self.root)
+            return
+        faltan = [n for n, s in (("batería", "BATERIA"), ("AIDA64", "AIDA"))
+                  if not os.path.isfile(os.path.join(self.carpeta, f"{self.orden}_{s}.html"))]
+        self.lbl_estado.configure(text=f"Reporte unido: {os.path.basename(ruta)}"
+                                  + (f" (sin {', '.join(faltan)})" if faltan else ""))
+        os.startfile(ruta)
+
     def _generar_reporte(self, abrir: bool):
         ruta = reporte.generar(self.carpeta, self._datos_reporte())
+        try:
+            reporte.unir(self.carpeta, self.orden)  # el archivo único también queda listo
+        except OSError:
+            pass
         copia = self.cfg.get("carpeta_copia", "").strip()
         aviso = ""
         if copia:
