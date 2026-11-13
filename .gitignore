@@ -1,0 +1,13 @@
+# Herramientas de terceros: no se suben (licencias comerciales y peso)
+ProgramData/
+# Resultados de clientes y fotos
+Informes/*
+!Informes/COPIAR AIDAS.BAT
+!Informes/Move-Files-by-Number.ps1
+# Contraseña Wi-Fi en claro
+WIFI.xml
+# Compilación
+build/
+dist/
+__pycache__/
+*.pyc
