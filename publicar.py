@@ -96,13 +96,34 @@ def main() -> int:
     if not os.path.isdir(DRIVE):
         print(f"No se encuentra la carpeta de Drive: {DRIVE}\n(¿Google Drive para escritorio está abierto?)")
         return 1
-    if "--sobrantes" in sys.argv:
-        propios = {a.lower() for a in archivos()} | {"version.json", "desktop.ini"}
+    if "--sobrantes" in sys.argv or "--limpiar" in sys.argv:
+        # lo publicado es lo que dice el version.json de Drive; todo lo demás sobra
+        try:
+            with open(os.path.join(DRIVE, "version.json"), encoding="utf-8") as fh:
+                propios = {a.lower() for a in json.load(fh)["archivos"]} | {"version.json"}
+        except (OSError, ValueError, KeyError):
+            print("No hay version.json en Drive: publica primero (py publicar.py).")
+            return 1
+        borrar = "--limpiar" in sys.argv
+        n_sobra = 0
         for raiz, _dirs, nombres in os.walk(DRIVE):
             for n in nombres:
                 rel = os.path.relpath(os.path.join(raiz, n), DRIVE).replace("\\", "/")
-                if rel.lower() not in propios:
+                if n.lower() == "desktop.ini" or rel.lower() in propios:
+                    continue
+                n_sobra += 1
+                if borrar:
+                    try:
+                        os.remove(os.path.join(raiz, n))  # Drive lo manda a su papelera (30 días)
+                    except OSError as exc:
+                        print("  no se pudo borrar:", rel, exc)
+                elif n_sobra <= 200:
                     print("  sobra en Drive:", rel)
+        if borrar:  # carpetas que quedaron vacías
+            for raiz, dirs, nombres in os.walk(DRIVE, topdown=False):
+                if raiz != DRIVE and not [n for n in os.listdir(raiz) if n.lower() != "desktop.ini"]:
+                    shutil.rmtree(raiz, ignore_errors=True)
+        print(f"{n_sobra} archivo(s) sobrante(s)" + (" borrados (quedan en la papelera de Drive)" if borrar else ""))
         return 0
 
     cache, publicado = cargar(CACHE), cargar(PUBLICADO)
