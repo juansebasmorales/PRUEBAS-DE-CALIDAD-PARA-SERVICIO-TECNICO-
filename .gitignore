@@ -4,8 +4,11 @@ ProgramData/
 Informes/*
 !Informes/COPIAR AIDAS.BAT
 !Informes/Move-Files-by-Number.ps1
-# Contraseña Wi-Fi en claro
+# Contraseña Wi-Fi en claro y configuración propia del taller
 WIFI.xml
+config.json
+PRUEBAS.exe
+src/pruebas.ico
 # Compilación
 build/
 dist/

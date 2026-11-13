@@ -1,101 +1,48 @@
-¡Claro que sí! Aquí tiene el README.md final y completo, con todas las correcciones sobre la estructura de directorios y la organización mejorada, listo para que lo copie y pegue en su repositorio de GitHub.
+# PRUEBAS v22 — recorrido de diagnóstico con evidencia automática
 
-🛠️ Suite de Diagnóstico y Pruebas para Servicio Técnico (PRUEBAS v10)
-Esta herramienta es un suite de diagnóstico por lotes (.bat) diseñado para estandarizar y optimizar la verificación y documentación del estado de hardware y software en equipos informáticos.
+`PRUEBAS.exe` guía al técnico por todas las pruebas de un equipo, **detecta sola** todo lo que se puede detectar
+y **toma una foto de la pantalla** como evidencia de cada prueba. Al terminar deja el checklist en HTML con las
+fotos, el informe de batería y el de AIDA64, todo en `Informes\<orden>\`.
 
-Su principal objetivo es garantizar que cada componente sea probado y que se genere evidencia clara y organizada para el reporte final de servicio.
+## Estructura
 
-🛑 Requisito de Ejecución y Estructura del Directorio
-El script solo funcionará si toda la estructura de archivos (incluyendo programas portables y carpetas de datos) se mantiene dentro del directorio /Pruebas/.
+```
+PRUEBAS\
+├── PRUEBAS.exe        <- el programa (pide administrador solo)
+├── config.json        <- se crea la primera vez (técnico, carpeta de copia, rutas de herramientas)
+├── ProgramData\       <- herramientas portables (no van en el repositorio)
+└── Informes\<orden>\  <- checklist, fotos\, informes de batería y AIDA64, resultado.json
+```
 
-Archivo Principal: PRUEBAS v10.BAT
+## Cómo funciona
 
-Ubicación Requerida: Debe estar dentro de la carpeta /Pruebas/ en la raíz de cualquier unidad (ej: C:\Pruebas\PRUEBAS v10.BAT).
+1. Al abrir, ya empieza a detectar el hardware y la licencia y a conectar el Wi-Fi (`ProgramData\WIFI.xml`).
+2. Escribe el **número de orden** y pulsa **INICIAR** (o Enter). Se minimiza y aparece una **barra flotante**.
+3. En segundo plano: informe de batería, AIDA64 y HWMonitor (este registra los máximos de temperatura de todo el
+   recorrido).
+4. Cada prueba:
+   - **Automática** (se resuelve sola y abre la ventana que lo demuestra para la foto): controladores,
+     licencia de Windows, salud de discos (CrystalDiskInfo + Hard Disk Sentinel), Bluetooth, red, Wi-Fi, DVD (N/A si
+     no hay), salud de batería.
+   - **Se aprueba sola cuando la detecta**: touchpad (prueba propia), cargador, cable de red, Wi-Fi, monitor
+     HDMI/VGA.
+   - **Manual**: se abre la herramienta y el técnico pulsa **OK / FALLA / N/A** en la barra. Al pulsar se toma la
+     foto con la herramienta en pantalla. Con FALLA pide qué falla. **FOTO EXTRA** agrega otra foto.
+5. Al terminar queda la tabla de revisión: se puede cambiar cualquier estado, poner comentarios, **repetir una
+   prueba** o seguir con las pendientes. El reporte se genera solo y con **GENERAR REPORTE** se vuelve a generar.
 
-Estructura Mínima Requerida:
+Si se cierra a la mitad, al escribir la misma orden pregunta si continuar donde quedó.
 
-/Pruebas/
+## config.json
 
-├── Informes/            <- Aquí se guardan los reportes (AIDA64, Batería, etc.)
+- `carpeta_copia`: si se llena (p. ej. `C:\\Users\\PC\\OneDrive\\FOTOS EVIDENCIA`), al generar el reporte se copia
+  la carpeta de la orden allí.
+- `umbral_bateria`: % de salud mínimo para marcar la batería OK (60 por defecto).
+- `herramientas`: ruta (relativa a `ProgramData`) y argumentos de cada herramienta.
 
-├── ProgramData/         <- Contiene todos los ejecutables portables (HWMonitor, Prime95, etc.)
+## Compilar
 
-└── PRUEBAS v10.BAT      <- Archivo principal del menú
-
-🚀 Flujo de Trabajo Automatizado (Opción 0)
-Al seleccionar la Opción 0 (Ejecutar TODAS las pruebas en ORDEN), el programa inicia un flujo de trabajo optimizado:
-
-Solicitud de Orden: Pide un Número de Orden (Ej: E123) para nombrar todos los archivos de reporte.
-
-Generación de Informes en Segundo Plano: Lanza automáticamente procesos no interactivos:
-
-Informe de Batería (powercfg /batteryreport).
-
-Informe AIDA64 (/QUICK /SILENT /EXIT).
-
-Diagnóstico de Discos Concurrente: Abre automáticamente utilidades como Hard Disk Sentinel, CrystalDiskInfo y HD Tune Pro para que el técnico pueda iniciar las pruebas de SSD/HDD mientras comienza la secuencia de verificación manual.
-
-📋 Secuencia de Pruebas Manuales Guiadas (Pasos 1-14)
-El script guía al técnico paso a paso a través de las verificaciones esenciales, abriendo las herramientas necesarias y esperando la confirmación manual:
-
-Paso 1: Prueba de Teclado (keyboardtestutility).
-
-Paso 2: Temperatura (CPU y GPU) con HWMonitor.
-
-Paso 3: Prueba de Pantalla (IsMyLcdOK) para píxeles muertos/fugas de luz.
-
-Paso 4: Prueba de Cámara (Aplicación de Windows).
-
-Paso 5: Prueba de Micrófono (Grabación y AudioRecorder).
-
-Paso 6: Prueba de Puertos HDMI/VGA (Conexión de monitor externo).
-
-Paso 7: Prueba de Carga (Verificar conexión del cargador).
-
-Paso 8: Prueba de Cable de Red.
-
-Paso 9: Verificación de WiFi (Conexión manual y navegación).
-
-Paso 10: Prueba de Bluetooth (Emparejar dispositivo).
-
-Paso 11: Prueba de Puertos USB (Conexión de memoria a cada puerto).
-
-Paso 12: Prueba de Sonido (Parlantes y Jack de Audio).
-
-Paso 13: Prueba de Unidad DVD/CD (Si aplica).
-
-Paso 14: Administrador de Dispositivos (devmgmt.msc) para revisar controladores.
-
-⚙️ Configuración y Utilidades Avanzadas
-Opción 21: Configurar Wi-Fi por defecto
-
-Función: Crea un archivo WIFI.xml en la ruta /ProgramData/.
-
-Propósito: Permite que el script se conecte automáticamente a la red Wi-Fi configurada cada vez que se ejecute la secuencia de pruebas, eliminando la necesidad de ingresar la contraseña repetidamente.
-
-Opción 22: Prueba de Estrés CPU
-
-Herramienta: Lanza Prime95.
-
-Objetivo: Verificar la estabilidad de la CPU bajo carga intensa (100% de uso) y monitorear temperaturas máximas.
-
-Opción 23: Prueba de Estrés GPU Núcleo
-
-Herramienta: Lanza FurMark.
-
-Objetivo: Carga intensa del núcleo del procesador gráfico para detectar fallos o throttling.
-
-Opción 24: Prueba de Estrés GPU Memoria
-
-Herramienta: Lanza OCCT.
-
-Objetivo: Prueba específica para la memoria de video (VRAM) de la tarjeta gráfica para detectar errores de integridad.
-
-📂 Informes y Evidencia
-El programa se enfoca en la documentación:
-
-Registro Fotográfico: El script recuerda al técnico que debe tomar fotos de evidencia de componentes que no pueden ser probados por software (como los puertos físicos).
-
-Ubicación de Reportes: Todos los informes generados (AIDA64, Batería, etc.) se almacenan en:
-
-/Pruebas/Informes/
+```
+py -m pip install nuitka pillow zstandard
+py construir_exe.py
+```
