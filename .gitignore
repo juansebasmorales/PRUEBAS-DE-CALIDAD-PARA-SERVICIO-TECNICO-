@@ -8,6 +8,12 @@ Informes/*
 WIFI.xml
 config.json
 PRUEBAS*.exe
+# Actualizador
+version.json
+.actualizacion_cache.json
+*.viejo
+*.descarga
+ACTUALIZAR.nuevo
 src/pruebas.ico
 # Compilación
 build/
