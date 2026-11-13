@@ -111,21 +111,94 @@ def exe_de(hwnd: int) -> str:
         kernel32.CloseHandle(h)
 
 
+user32.GetClassNameW.argtypes = [wt.HWND, wt.LPWSTR, ctypes.c_int]
+user32.EnumChildWindows.argtypes = [wt.HWND, _EnumProc, wt.LPARAM]
+
+
+def clase(hwnd: int) -> str:
+    buf = ctypes.create_unicode_buffer(256)
+    user32.GetClassNameW(hwnd, buf, 256)
+    return buf.value
+
+
+def es_dialogo(hwnd: int) -> bool:
+    return clase(hwnd) == "#32770"
+
+
 def esperar_nuevas(antes: set[int], timeout: float = 15.0, cancelar=None) -> list[int]:
-    """Espera a que aparezca(n) ventana(s) nueva(s) respecto a 'antes'. Devuelve [] si no apareció ninguna."""
+    """
+    Espera a que aparezca(n) ventana(s) nueva(s) respecto a 'antes'. Si solo aparece un cuadro de diálogo
+    (aviso de actualización, licencia), sigue esperando la ventana principal. [] si no apareció ninguna.
+    """
     def nuevas_ahora():
         return [h for h in ventanas() if h not in antes and exe_de(h) not in IGNORAR]
 
     fin = time.time() + timeout
+    dialogos: list[int] = []
     while time.time() < fin:
         if cancelar is not None and cancelar():
             return []
         nuevas = nuevas_ahora()
-        if nuevas:
+        principales = [h for h in nuevas if not es_dialogo(h)]
+        if principales:
             time.sleep(0.6)  # que termine de dibujarse (y aparezcan las demás del mismo programa)
-            return nuevas_ahora() or nuevas
+            return [h for h in nuevas_ahora() if not es_dialogo(h)] or principales
+        dialogos = nuevas or dialogos
         time.sleep(0.25)
-    return []
+    return [h for h in dialogos if existe(h)]
+
+
+def _hijos(hwnd: int) -> list[int]:
+    res: list[int] = []
+
+    def cb(h, _lp):
+        res.append(int(h))
+        return True
+    user32.EnumChildWindows(hwnd, _EnumProc(cb), 0)
+    return res
+
+
+# Botones que se pueden pulsar solos en un aviso, por orden de preferencia. Nunca 'actualizar', 'descargar' ni 'sí'.
+CONTINUAR = ("continue", "continuar", "later", "más tarde", "mas tarde", "remind me later", "no", "cancel",
+             "cancelar", "close", "cerrar", "ok", "aceptar")
+NUNCA = ("update", "actualizar", "download", "descargar", "yes", "sí", "si", "install", "instalar", "buy", "comprar")
+
+
+def pulsar_continuar(hwnd: int) -> str:
+    """Pulsa el botón 'Continuar' (o el más inofensivo) de un cuadro de diálogo. Devuelve el texto pulsado o ''."""
+    botones = {}
+    for h in _hijos(hwnd):
+        if clase(h).lower() != "button":
+            continue
+        n = user32.GetWindowTextLengthW(h)
+        buf = ctypes.create_unicode_buffer(n + 1)
+        user32.GetWindowTextW(h, buf, n + 1)
+        txt = buf.value.replace("&", "").strip().lower()
+        if txt and not any(txt == x or txt.startswith(x + " ") for x in NUNCA):
+            botones[txt] = h
+    for objetivo in CONTINUAR:
+        if objetivo in botones:
+            user32.PostMessageW(botones[objetivo], 0x00F5, 0, 0)  # BM_CLICK
+            return objetivo
+    return ""
+
+
+def auto_continuar(exes: set[str], segundos: float = 30.0) -> list[str]:
+    """Durante 'segundos', pulsa 'Continuar' en los avisos (#32770) que abran esos programas."""
+    vistos: set[int] = set()
+    pulsados: list[str] = []
+    fin = time.time() + segundos
+    while time.time() < fin:
+        for h in list(ventanas()):
+            if h in vistos or not es_dialogo(h) or exe_de(h) not in exes:
+                continue
+            time.sleep(0.4)  # que termine de crear sus botones
+            txt = pulsar_continuar(h)
+            if txt:
+                vistos.add(h)
+                pulsados.append(txt)
+        time.sleep(0.4)
+    return pulsados
 
 
 def minimizar(hwnd: int) -> None:

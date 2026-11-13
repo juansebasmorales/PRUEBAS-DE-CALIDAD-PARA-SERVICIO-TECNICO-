@@ -71,6 +71,7 @@ def generar(carpeta: str, datos: dict) -> str:
                             ("Serial", hw.get("serial")), ("BIOS", hw.get("bios")), ("CPU", hw.get("cpu")),
                             ("RAM", hw.get("ram")), ("GPU", hw.get("gpu")), ("Sistema", hw.get("sistema")),
                             ("Almacenamiento", discos), ("Licencia Windows", datos.get("licencia_texto")),
+                            ("Licencia Office", datos.get("office_texto")),
                             ("Batería", datos.get("bateria_texto"))):
         partes.append(_fila_hw(etiqueta, valor))
     partes.append("</div><table><tr><th>#</th><th>PRUEBA</th><th>ESTADO</th><th>DETALLE / COMENTARIO</th></tr>")

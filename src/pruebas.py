@@ -60,6 +60,7 @@ CONFIG_DEF = {
     },
 }
 
+HWMONITOR_EXES = {"hwmonitor_x64.exe", "hwmonitor_x32.exe", "hwmonitorportable.exe", "hwmonitor.exe"}
 ESTADOS = ("OK", "FALLA", "N/A")
 COLOR = {"OK": "#1e8e3e", "FALLA": "#d93025", "N/A": "#5f6c7b", "": "#b06000"}
 
@@ -174,6 +175,88 @@ class Touchpad:
             self.top.destroy()
         except tk.TclError:
             pass
+
+
+class WifiDialogo:
+    """Elegir una red cercana (o escribirla), su contraseña, y dejarla como red por defecto del taller."""
+
+    def __init__(self, app: "App"):
+        self.app = app
+        t = self.top = tk.Toplevel(app.root)
+        t.title("Configurar nueva red Wi-Fi")
+        t.configure(bg="white", padx=18, pady=14)
+        t.transient(app.root)
+        t.resizable(False, False)
+        f = ("Segoe UI", 11)
+        tk.Label(t, text="Red (SSID)", font=("Segoe UI", 10, "bold"), bg="white").grid(row=0, column=0, sticky="w")
+        self.var_ssid = tk.StringVar(value=detectar.red_guardada(WIFI_XML))
+        self.cmb = ttk.Combobox(t, textvariable=self.var_ssid, font=f, width=34)
+        self.cmb.grid(row=1, column=0, sticky="we")
+        self.cmb.bind("<<ComboboxSelected>>", self._elegida)
+        tk.Button(t, text="Buscar redes", font=("Segoe UI", 9), relief="flat", bg="#e3e6ea",
+                  command=self._buscar).grid(row=1, column=1, padx=(8, 0))
+        tk.Label(t, text="Seguridad", font=("Segoe UI", 10, "bold"), bg="white").grid(row=2, column=0, sticky="w",
+                                                                                      pady=(10, 0))
+        self.var_seg = tk.StringVar(value="WPA2-Personal")
+        ttk.Combobox(t, textvariable=self.var_seg, values=list(detectar.SEGURIDAD), state="readonly", font=f,
+                     width=20).grid(row=3, column=0, sticky="w")
+        tk.Label(t, text="Contraseña", font=("Segoe UI", 10, "bold"), bg="white").grid(row=4, column=0, sticky="w",
+                                                                                       pady=(10, 0))
+        self.ent_clave = tk.Entry(t, font=f, width=36, show="•")
+        self.ent_clave.grid(row=5, column=0, sticky="we")
+        self.var_ver = tk.BooleanVar(value=False)
+        tk.Checkbutton(t, text="Mostrar", variable=self.var_ver, bg="white",
+                       command=lambda: self.ent_clave.configure(show="" if self.var_ver.get() else "•")).grid(
+            row=5, column=1, padx=(8, 0))
+        self.lbl = tk.Label(t, text="", font=("Segoe UI", 9), bg="white", fg="#555")
+        self.lbl.grid(row=6, column=0, columnspan=2, sticky="w", pady=(8, 0))
+        botones = tk.Frame(t, bg="white")
+        botones.grid(row=7, column=0, columnspan=2, sticky="e", pady=(12, 0))
+        tk.Button(botones, text="Cancelar", font=("Segoe UI", 10), relief="flat", bg="#e3e6ea", padx=10,
+                  command=t.destroy).pack(side="right")
+        tk.Button(botones, text="Guardar y conectar", font=("Segoe UI", 10, "bold"), relief="flat", bg="#0b5ed7",
+                  fg="white", padx=12, command=self._guardar).pack(side="right", padx=8)
+        self.ent_clave.bind("<Return>", lambda e: self._guardar())
+        self.redes: dict[str, dict] = {}
+        self._buscar()
+        self.cmb.focus_set()
+
+    def _buscar(self):
+        self.lbl.configure(text="Buscando redes cercanas...")
+
+        def hilo():
+            redes = detectar.redes_cercanas()
+            self.app.ui_async(self._mostrar_redes, redes)
+        threading.Thread(target=hilo, daemon=True).start()
+
+    def _mostrar_redes(self, redes):
+        if not self.top.winfo_exists():
+            return
+        self.redes = {r["ssid"]: r for r in redes}
+        self.cmb.configure(values=[r["ssid"] for r in redes])
+        self.lbl.configure(text=f"{len(redes)} red(es) encontrada(s). Elige una o escribe el nombre."
+                           if redes else "No se encontraron redes (¿Wi-Fi apagado?). Puedes escribir el nombre.")
+        if self.var_ssid.get() in self.redes:
+            self._elegida()
+
+    def _elegida(self, _e=None):
+        r = self.redes.get(self.var_ssid.get())
+        if r:
+            self.var_seg.set(detectar.seguridad_de(r["seguridad"]))
+            self.lbl.configure(text=f"{r['seguridad'] or 'Seguridad desconocida'} · señal {r['senal']} %")
+        self.ent_clave.focus_set()
+
+    def _guardar(self):
+        ssid, clave, seg = self.var_ssid.get().strip(), self.ent_clave.get(), self.var_seg.get()
+        if not ssid:
+            self.lbl.configure(text="Escribe o elige el nombre de la red.", fg="#d93025")
+            return
+        if seg != "Abierta" and len(clave) < 8:
+            self.lbl.configure(text="La contraseña Wi-Fi tiene al menos 8 caracteres.", fg="#d93025")
+            return
+        detectar.crear_perfil_wifi(WIFI_XML, ssid, clave, seg)
+        self.top.destroy()
+        self.app._reconectar_wifi()
 
 
 # =====================================================================================================
@@ -318,7 +401,8 @@ class App:
         self.lic: dict = {}
         self.cdi: list = []
         self.bat: dict = {}
-        self.ev_hw, self.ev_lic, self.ev_cdi, self.ev_bat = (threading.Event() for _ in range(4))
+        self.office: dict = {}
+        self.ev_hw, self.ev_lic, self.ev_cdi, self.ev_bat, self.ev_office = (threading.Event() for _ in range(5))
         self.estado_wifi = "Wi-Fi: conectando..." if os.path.isfile(WIFI_XML) else "Wi-Fi: sin WIFI.xml"
 
         self.orden = ""
@@ -398,7 +482,12 @@ class App:
             self.cdi = detectar.crystaldiskinfo(self._ruta("cdi"))
             self.ev_cdi.set()
 
-        for f in (wifi, hw, lic, cdi):
+        def office():
+            self.office = detectar.office()
+            self.ev_office.set()
+            self.ui_async(self._refrescar_resumen)
+
+        for f in (wifi, hw, lic, cdi, office):
             threading.Thread(target=f, daemon=True).start()
 
     def _ruta(self, clave: str) -> str:
@@ -446,6 +535,17 @@ class App:
         self.ent_orden.bind("<Return>", lambda e: self._iniciar())
         self.ent_orden.focus_set()
 
+        red = tk.Frame(c, bg="white", highlightthickness=1, highlightbackground="#ddd")
+        red.pack(fill="x", pady=(0, 12))
+        tk.Label(red, text="Red Wi-Fi", font=("Segoe UI", 11, "bold"), bg="white").pack(side="left", padx=(14, 10),
+                                                                                       pady=10)
+        self.lbl_wifi = tk.Label(red, text="", font=("Segoe UI", 10), bg="white", fg="#333", anchor="w")
+        self.lbl_wifi.pack(side="left", fill="x", expand=True)
+        tk.Button(red, text="Conectar", font=("Segoe UI", 10), relief="flat", bg="#e3e6ea", padx=10,
+                  command=self._reconectar_wifi).pack(side="right", padx=(0, 14))
+        tk.Button(red, text="Configurar nueva red", font=("Segoe UI", 10, "bold"), relief="flat", bg="#0b5ed7",
+                  fg="white", padx=12, command=self._config_wifi).pack(side="right", padx=8)
+
         tk.Label(c, text="Equipo detectado", font=("Segoe UI", 12, "bold"), bg="#f4f5f7").pack(anchor="w")
         self.lbl_resumen = tk.Label(c, text="", font=("Consolas", 10), bg="white", fg="#222", justify="left",
                                     anchor="nw", padx=14, pady=10, highlightthickness=1,
@@ -453,7 +553,7 @@ class App:
         self.lbl_resumen.pack(fill="both", expand=True, pady=(4, 10))
         barra = tk.Frame(c, bg="#f4f5f7")
         barra.pack(fill="x")
-        for texto, fn in (("Configurar Wi-Fi", self._config_wifi), ("Abrir carpeta Informes", self._abrir_informes),
+        for texto, fn in (("Abrir carpeta Informes", self._abrir_informes),
                           ("Editar configuración", lambda: os.startfile(CONFIG))):
             tk.Button(barra, text=texto, font=("Segoe UI", 10), relief="flat", bg="#e3e6ea", padx=10,
                       command=fn).pack(side="left", padx=(0, 8))
@@ -479,19 +579,32 @@ class App:
                 f"{'Errores disp.':14}{len(h.get('dispositivos_error', []))}",
             ])
         lic = self.lic.get("texto", "consultando...") if self.ev_lic.is_set() else "consultando..."
-        txt += f"\n{'Licencia':14}{lic}\n\n{self.estado_wifi}"
+        off = self.office.get("texto", "") if self.ev_office.is_set() else "consultando..."
+        txt += f"\n{'Windows':14}{lic}\n{'Office':14}{off}"
         self.lbl_resumen.configure(text=txt)
+        if hasattr(self, "lbl_wifi") and self.lbl_wifi.winfo_exists():
+            guardada = detectar.red_guardada(WIFI_XML)
+            self.lbl_wifi.configure(text=(f"Por defecto: {guardada}   ·   " if guardada else
+                                          "Sin red por defecto   ·   ") + self.estado_wifi.replace("Wi-Fi: ", ""))
 
     def _config_wifi(self):
-        ssid = simpledialog.askstring("Wi-Fi por defecto", "Nombre de la red (SSID):", parent=self.root)
-        if not ssid:
+        WifiDialogo(self)
+
+    def _reconectar_wifi(self):
+        if not os.path.isfile(WIFI_XML):
+            self._config_wifi()
             return
-        clave = simpledialog.askstring("Wi-Fi por defecto", f"Contraseña de {ssid}:", parent=self.root, show="•")
-        if clave is None:
-            return
-        detectar.crear_perfil_wifi(WIFI_XML, ssid, clave)
-        self.estado_wifi = "Wi-Fi: " + detectar.conectar_wifi(WIFI_XML)
+        self.estado_wifi = "Wi-Fi: conectando..."
         self._refrescar_resumen()
+
+        def hilo():
+            self.estado_wifi = "Wi-Fi: " + detectar.conectar_wifi(WIFI_XML)
+            time.sleep(4)  # netsh responde antes de terminar de conectar
+            ok, txt = detectar.wifi_estado()
+            if ok:
+                self.estado_wifi = "Wi-Fi: conectado · " + txt
+            self.ui_async(self._refrescar_resumen)
+        threading.Thread(target=hilo, daemon=True).start()
 
     def _abrir_informes(self):
         os.makedirs(INFORMES, exist_ok=True)
@@ -600,6 +713,7 @@ class App:
               evidencia=[("devmgmt.msc", 1.5)]),
             P("licencia", "Licencia de Windows", auto=self._auto_licencia,
               evidencia=[("ms-settings:activation", 2.0)]),
+            P("office", "Licencia de Office", auto=self._auto_office),
             P("discos", "Salud de discos (SMART)", auto=self._auto_discos,
               evidencia=[("cdi", 2.0), ("hdsentinel", 5.0)]),
             P("hdtune", "Rendimiento de disco (HD Tune)", "Revisa la gráfica: sin caídas a cero ni bloques "
@@ -641,7 +755,7 @@ class App:
 
     def _ejecutar(self, paso: Paso):
         if paso.tipo == "fondo":
-            hw = self._abrir(paso.herramienta, limpiar=True)
+            hw = self._abrir(paso.herramienta)
             self.largas[paso.id] = hw or []
             for h in hw or []:
                 win.minimizar(h)
@@ -784,21 +898,50 @@ class App:
             return False
         try:
             if ruta.lower().endswith(".exe"):
-                subprocess.Popen([ruta, *args], cwd=os.path.dirname(ruta))
+                try:
+                    subprocess.Popen([ruta, *args], cwd=os.path.dirname(ruta))
+                except OSError as exc:
+                    if getattr(exc, "winerror", None) != 740:  # 740 = pide administrador: que Windows pregunte
+                        raise
+                    os.startfile(ruta, "open", subprocess.list2cmdline(args), os.path.dirname(ruta))
             else:
                 os.startfile(ruta)
             return True
         except OSError:
             return False
 
-    def _abrir(self, destino: str, limpiar: bool = False) -> list[int] | None:
+    def _abrir(self, destino: str) -> list[int] | None:
         """Abre la herramienta y devuelve sus ventanas nuevas (None si no está instalada)."""
-        if limpiar and destino == "temperatura":
-            shutil.rmtree(os.path.join(os.path.dirname(self._ruta(destino)), "Data"), ignore_errors=True)
+        if destino == "temperatura":
+            self._preparar_hwmonitor()
         antes = set(win.ventanas())
         if not self._lanzar(destino):
             return None
+        if destino == "temperatura":
+            # si aun así sale el aviso de actualización, se le da 'Continuar' solo
+            threading.Thread(target=win.auto_continuar, args=(HWMONITOR_EXES, 40), daemon=True).start()
         return win.esperar_nuevas(antes, timeout=20)
+
+    def _preparar_hwmonitor(self):
+        """
+        HWMonitor pregunta por actualizaciones cuando no encuentra su configuración (el .BAT viejo borraba Data).
+        Se deja UPDATES=0 en la configuración actual y en la de fábrica del portable.
+        """
+        carpeta = os.path.dirname(self._ruta("temperatura"))
+        for rel in (("Data", "hwmonitorw.ini"), ("App", "DefaultData", "hwmonitorw.ini"),
+                    ("App", "HWMonitor", "hwmonitorw.ini")):
+            ruta = os.path.join(carpeta, *rel)
+            if rel[-2] == "HWMonitor" and not os.path.isfile(ruta):
+                continue  # solo existe mientras HWMonitor está abierto
+            if not os.path.isfile(ruta):
+                try:  # nuevo en UTF-16 con BOM, como los crea HWMonitor
+                    os.makedirs(os.path.dirname(ruta), exist_ok=True)
+                    with open(ruta, "w", encoding="utf-16") as fh:
+                        fh.write("[HWMonitor]\r\n")
+                except OSError:
+                    continue
+            # la API de Windows respeta la codificación del .ini (UTF-16 o ANSI)
+            ctypes.windll.kernel32.WritePrivateProfileStringW("HWMonitor", "UPDATES", "0", ruta)
 
     def _guardar(self, paso: Paso, estado: str, detalle: str, comentario: str, fotos: list[str]):
         self.resultados[paso.id] = {"estado": estado, "detalle": detalle, "comentario": comentario,
@@ -922,6 +1065,10 @@ class App:
             canal = self.lic.get("canal") or ""
             return "OK", f"Activado{' (' + canal + ')' if canal else ''}"
         return "FALLA", texto
+
+    def _auto_office(self):
+        self.ev_office.wait(90)
+        return self.office.get("resultado") or "FALLA", self.office.get("texto", "No se pudo consultar")
 
     def _auto_discos(self):
         self.ev_hw.wait(60)
@@ -1107,6 +1254,7 @@ class App:
         return {"orden": self.orden, "tecnico": self.cfg.get("tecnico", ""), "version": VERSION,
                 "fecha": datetime.datetime.now().strftime("%Y-%m-%d %H:%M"), "hardware": self.hw,
                 "licencia_texto": self.lic.get("texto", ""),
+                "office_texto": self.office.get("texto", ""),
                 "bateria_texto": f"{b['salud']} % de salud ({b['actual_mwh']}/{b['diseno_mwh']} mWh)" if b else "",
                 "pasos": pasos,
                 "adjuntos": [("Informe de batería", f"{self.orden}_BATERIA.html"),
