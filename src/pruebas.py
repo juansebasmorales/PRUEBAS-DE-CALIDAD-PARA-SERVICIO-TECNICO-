@@ -28,7 +28,7 @@ import detectar
 import reporte
 import ventanas as win
 
-VERSION = "22.0"
+VERSION = "22.1"
 
 if "__compiled__" in globals():
     BASE = os.path.dirname(os.path.abspath(sys.argv[0]))

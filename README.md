@@ -40,9 +40,21 @@ Si se cierra a la mitad, al escribir la misma orden pregunta si continuar donde 
 - `umbral_bateria`: % de salud mínimo para marcar la batería OK (60 por defecto).
 - `herramientas`: ruta (relativa a `ProgramData`) y argumentos de cada herramienta.
 
-## Compilar
+## Actualizar (en cada USB o PC)
+
+Doble clic en **`ACTUALIZAR.bat`**. Compara con la carpeta pública de Google Drive y baja **solo los archivos que
+cambiaron** (comprueba cada uno con SHA-256). No toca `Informes`, `config.json` ni `WIFI.xml`. Si `PRUEBAS.exe`
+está abierto, el anterior queda como `PRUEBAS.exe.viejo`. La primera vez revisa todo (1-2 minutos); después tarda
+unos segundos.
+
+## Compilar y publicar (solo en el PC de desarrollo)
 
 ```
 py -m pip install nuitka pillow zstandard
 py construir_exe.py
+py publicar.py
 ```
+
+`publicar.py` copia lo que cambió a `Z:\Mi unidad\PRUEBASv2` (Google Drive para escritorio lo sube) y escribe
+`version.json`, la lista que usa `ACTUALIZAR.bat`. `py publicar.py --ver` muestra qué se publicaría sin copiar, y
+`py publicar.py --sobrantes` lista lo que hay en Drive y no es parte del programa.

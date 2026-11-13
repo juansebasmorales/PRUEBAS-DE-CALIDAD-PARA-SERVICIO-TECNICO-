@@ -14,6 +14,7 @@ import re
 import shutil
 import subprocess
 import sys
+import time
 
 APP_DIR = os.path.dirname(os.path.abspath(__file__))
 SRC = os.path.join(APP_DIR, "src")
@@ -43,8 +44,10 @@ def main() -> int:
     cmd = [sys.executable, "-m", "nuitka", "--onefile", "--assume-yes-for-downloads",
            "--enable-plugin=tk-inter", "--windows-console-mode=disable", "--windows-uac-admin",
            "--windows-icon-from-ico=" + ICONO,
-           # se descomprime una sola vez por equipo (las siguientes aperturas son inmediatas)
-           "--onefile-tempdir-spec={CACHE_DIR}/PRUEBAS/" + ver,
+           # se descomprime una sola vez por equipo (las siguientes aperturas son inmediatas). La fecha y hora de
+           # compilación van en la carpeta: si no, un equipo que ya abrió otra compilación de la misma versión
+           # seguiría usando los archivos viejos
+           "--onefile-tempdir-spec={CACHE_DIR}/PRUEBAS/" + ver + "-" + time.strftime("%Y%m%d%H%M%S"),
            "--include-module=PIL.ImageGrab", "--include-module=PIL.JpegImagePlugin",
            "--nofollow-import-to=numpy", "--nofollow-import-to=PIL.ImageQt", "--nofollow-import-to=PIL.ImageTk",
            "--company-name=Servicio tecnico", "--product-name=PRUEBAS", "--file-version=" + v4,
