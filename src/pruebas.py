@@ -30,7 +30,7 @@ import pagina_ui
 import reporte
 import ventanas as win
 
-VERSION = "22.4"
+VERSION = "22.5"
 
 if "__compiled__" in globals():
     BASE = os.path.dirname(os.path.abspath(sys.argv[0]))
@@ -804,16 +804,18 @@ class App:
 
         def enviar():
             estado("Preparando el envío a la página (reporte PDF y fotos)...")
-            aida = os.path.isfile(os.path.join(carpeta, f"{orden}_AIDA.html"))
+            aida = bool(reporte.informe(carpeta, orden, "AIDA"))
             resultados, origen = pagina.armar_resultados(datos["pasos"], enlace["lista"], aida)
             if not resultados:
                 estado("Ninguna prueba coincide con la lista de la orden: no se envió nada.")
                 return
             notas: list[str] = []
+            extra: dict = {}
             archivos = pagina.armar_archivos(carpeta, orden, origen, datos, limite,
-                                             pagina.ya_subidos(carpeta, enlace["tipo"]), notas)
+                                             pagina.ya_subidos(carpeta, enlace["tipo"]), notas, extra)
             envio = pagina.nuevo_envio(carpeta, enlace, enlace["tipo"], pc, VERSION, resultados, archivos)
-            envio["notas"] = notas
+            envio.update(extra, notas=notas)
+            pagina.guardar_envio(carpeta, envio)
             for espera in (0,) + pagina.REINTENTOS:
                 if espera:
                     estado(f"Sin respuesta de la página: se reintenta en {espera // 60 or espera}"
@@ -896,7 +898,7 @@ class App:
         threading.Thread(target=bateria, daemon=True).start()
         aida = self._ruta("aida")
         destino = os.path.join(self.carpeta, f"{self.orden}_AIDA.html")
-        if os.path.isfile(aida) and not os.path.isfile(destino):
+        if os.path.isfile(aida) and not reporte.informe(self.carpeta, self.orden, "AIDA"):
             try:
                 subprocess.Popen([aida, "/R", destino, "/HTML", "/QUICK", "/SILENT", "/EXIT"],
                                  cwd=os.path.dirname(aida))
@@ -1097,6 +1099,9 @@ class App:
             self.ui(self.barra.marcar, d, ultimo if d == "OK" and ultimo else "")
             time.sleep(0.35)
             vivas = [h for h in (foco or []) if win.existe(h)]
+            if vivas and not paso.paginas:
+                win.al_frente(max(vivas, key=win.area))   # la ventana de la prueba adelante para la foto
+                time.sleep(0.3)
             if paso.paginas and vivas:
                 h = max(vivas, key=win.area)
                 # HWMonitor: se dejan abiertas solo las temperaturas de CPU y GPU -> 1 foto (máx. 2)
@@ -1117,11 +1122,17 @@ class App:
         """Abre la ventana que demuestra un resultado automático, le toma la foto y la cierra."""
         fotos = []
         for destino, espera in paso.evidencia:
+            ya_abiertas = self._ventanas_de(destino)
             antes = set(win.ventanas())
-            if not self._lanzar(destino):
+            if ya_abiertas:
+                nuevas = ya_abiertas   # ya estaba abierta: no se abre otra vez, se usa esa
+            elif not self._lanzar(destino):
                 continue
-            nuevas = win.esperar_nuevas(antes, timeout=12)
-            if not self._es_de_windows(destino):
+            else:
+                nuevas = win.esperar_nuevas(antes, timeout=12)
+            if ya_abiertas:
+                visibles = ya_abiertas
+            elif not self._es_de_windows(destino):
                 # herramienta portable (CrystalDiskInfo, Hard Disk Sentinel): se espera SU ventana, aunque tarde en
                 # salir o ya estuviera abierta, y se cierran sus avisos (cuenta regresiva de evaluación, 'Close')
                 principales = win.esperar_sin_avisos(self._exes_de(destino),
@@ -1136,6 +1147,7 @@ class App:
             win.al_frente(max(visibles, key=win.area))
             time.sleep(espera)
             win.al_frente(max(visibles, key=win.area))
+            time.sleep(0.3)
             f = self._foto(paso)
             if f:
                 fotos.append(f)
@@ -1250,8 +1262,21 @@ class App:
         except OSError:
             return False
 
+    def _ventanas_de(self, destino: str) -> list[int]:
+        """Ventanas que ya tiene abiertas esa herramienta portable (para no abrirla dos veces)."""
+        if self._es_de_windows(destino):
+            return []
+        ruta = self._ruta(destino)
+        if not ruta or not ruta.lower().endswith(".exe") or not os.path.isfile(ruta):
+            return []
+        exes = self._exes_de(destino)
+        return [h for h in win.ventanas() if win.exe_de(h) in exes and not win.es_aviso(h)]
+
     def _abrir(self, destino: str) -> list[int] | None:
         """Abre la herramienta y devuelve sus ventanas nuevas (None si no está instalada)."""
+        ya = self._ventanas_de(destino)
+        if ya:
+            return ya   # ya estaba abierta (HD Tune, HWMonitor...): se usa esa, no se abre otra
         if destino == "temperatura":
             self._preparar_hwmonitor()
         antes = set(win.ventanas())
@@ -1622,11 +1647,13 @@ class App:
                 "office_texto": self.office.get("texto", ""),
                 "bateria_texto": f"{b['salud']} % de salud ({b['actual_mwh']}/{b['diseno_mwh']} mWh)" if b else "",
                 "pasos": pasos,
-                "adjuntos": [("Informe de batería", f"{self.orden}_BATERIA.html"),
-                             ("Informe AIDA64", f"{self.orden}_AIDA.html")]}
+                "adjuntos": [(n, os.path.basename(r)) for n, r in (
+                    ("Informe de batería", reporte.informe(self.carpeta, self.orden, "BATERIA")),
+                    ("Informe AIDA64", reporte.informe(self.carpeta, self.orden, "AIDA"))) if r]}
 
     def _abrir_reporte(self, sufijo: str):
-        ruta = os.path.join(self.carpeta, f"{self.orden}_{sufijo}.html")
+        ruta = reporte.informe(self.carpeta, self.orden, sufijo) or \
+            os.path.join(self.carpeta, f"{self.orden}_{sufijo}.html")
         if sufijo == "CHECKLIST":
             ruta = self._generar_reporte(False)
         if os.path.isfile(ruta):
@@ -1644,7 +1671,7 @@ class App:
             messagebox.showinfo("PRUEBAS", "Todavía no hay checklist para unir.", parent=self.root)
             return
         faltan = [n for n, s in (("batería", "BATERIA"), ("AIDA64", "AIDA"))
-                  if not os.path.isfile(os.path.join(self.carpeta, f"{self.orden}_{s}.html"))]
+                  if not reporte.informe(self.carpeta, self.orden, s)]
         self.lbl_estado.configure(text=f"Reporte unido: {os.path.basename(ruta)}"
                                   + (f" (sin {', '.join(faltan)})" if faltan else ""))
         os.startfile(ruta)

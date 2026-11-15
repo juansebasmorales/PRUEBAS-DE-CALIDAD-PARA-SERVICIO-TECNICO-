@@ -328,6 +328,10 @@ def area(hwnd: int) -> int:
     return max(0, r.right - r.left) * max(0, r.bottom - r.top)
 
 
+user32.SetWindowPos.argtypes = [wt.HWND, ctypes.c_ssize_t, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int,
+                                wt.UINT]
+
+
 def al_frente(hwnd: int, maximizar: bool = False) -> None:
     if not hwnd or not user32.IsWindow(hwnd):
         return
@@ -344,6 +348,16 @@ def al_frente(hwnd: int, maximizar: bool = False) -> None:
     user32.SetForegroundWindow(hwnd)
     if t_fg and t_fg != t_yo:
         user32.AttachThreadInput(t_yo, t_fg, False)
+    if user32.GetForegroundWindow() != hwnd:
+        # Windows a veces no deja pasar el foco si este proceso no tuvo la última entrada: un movimiento de
+        # mouse de 0 píxeles (no hace nada visible ni pulsa nada) se lo da
+        user32.mouse_event(0x0001, 0, 0, 0, 0)
+        time.sleep(0.05)
+        user32.SetForegroundWindow(hwnd)
+    # y siempre encima de las demás ventanas (sin quedar 'siempre visible'; la barra sigue arriba)
+    flags = 0x0001 | 0x0002 | 0x0010   # SWP_NOSIZE | SWP_NOMOVE | SWP_NOACTIVATE
+    user32.SetWindowPos(hwnd, -1, 0, 0, 0, 0, flags)   # HWND_TOPMOST
+    user32.SetWindowPos(hwnd, -2, 0, 0, 0, 0, flags)   # HWND_NOTOPMOST
 
 
 def cerrar(hwnds) -> None:

@@ -117,6 +117,16 @@ def _leer_html(ruta: str) -> str:
     """HTML de otro programa en el texto correcto (powercfg usa UTF-8/UTF-16, AIDA64 suele usar ANSI)."""
     with open(ruta, "rb") as fh:
         crudo = fh.read()
+    if ruta.lower().endswith((".mht", ".mhtml")):   # archivo web de AIDA64: se saca la parte HTML
+        import email
+        from email import policy
+        msg = email.message_from_bytes(crudo, policy=policy.default)
+        for parte in msg.walk():
+            if parte.get_content_type() == "text/html":
+                try:
+                    return parte.get_content()
+                except (LookupError, ValueError):
+                    break
     if crudo[:2] in (b"\xff\xfe", b"\xfe\xff"):
         return crudo.decode("utf-16", errors="replace")
     try:
@@ -149,16 +159,40 @@ AMPLIAR = ("<script>document.querySelectorAll('img').forEach(function(i){i.style
            "</script>")
 
 
+def informe(carpeta: str, orden: str, sufijo: str) -> str:
+    """
+    Ruta del informe <orden>_<sufijo>.html. AIDA64 a veces lo guarda con otra extensión (.htm, .html.htm, .mht):
+    se busca cualquiera. '' si no está.
+    """
+    exacto = os.path.join(carpeta, f"{orden}_{sufijo}.html")
+    if os.path.isfile(exacto):
+        return exacto
+    try:
+        nombres = sorted(os.listdir(carpeta))
+    except OSError:
+        return ""
+    for n in nombres:
+        b = n.lower()
+        if b.startswith(f"{orden}_{sufijo}".lower()) and b.endswith((".htm", ".html", ".mht", ".mhtml")) \
+                and os.path.getsize(os.path.join(carpeta, n)) > 0:
+            return os.path.join(carpeta, n)
+    if sufijo == "AIDA":   # por si AIDA64 usó su propio nombre
+        for n in nombres:
+            b = n.lower()
+            if "aida" in b and b.endswith((".htm", ".html", ".mht", ".mhtml")):
+                return os.path.join(carpeta, n)
+    return ""
+
+
 def unir(carpeta: str, orden: str) -> str | None:
     """
     Junta checklist + informe de batería + AIDA64 en <orden>_REPORTE_COMPLETO.html: un solo archivo con pestañas
     y las fotos adentro (para enviarlo o subirlo sin perder nada). None si no hay checklist todavía.
     """
     partes = []
-    for nombre, archivo in (("Checklist", f"{orden}_CHECKLIST.html"), ("Batería", f"{orden}_BATERIA.html"),
-                            ("AIDA64", f"{orden}_AIDA.html")):
-        ruta = os.path.join(carpeta, archivo)
-        if not os.path.isfile(ruta):
+    for nombre, sufijo in (("Checklist", "CHECKLIST"), ("Batería", "BATERIA"), ("AIDA64", "AIDA")):
+        ruta = informe(carpeta, orden, sufijo)
+        if not ruta:
             continue
         try:
             html = _leer_html(ruta)

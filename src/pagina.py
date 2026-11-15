@@ -277,7 +277,8 @@ def huella(ruta: str) -> str:
 
 
 def armar_archivos(carpeta: str, orden: str, origen: dict, datos: dict, limite: int = MAX_ARCHIVOS,
-                   ya_subidos: set | None = None, notas: list | None = None) -> list[tuple[dict, str]]:
+                   ya_subidos: set | None = None, notas: list | None = None,
+                   extra: dict | None = None) -> list[tuple[dict, str]]:
     """
     [(datos del archivo para 'enviar', ruta local)], por prioridad hasta 'limite' (lo que acepte la página):
       1. el reporte del checklist en PDF, sin fotos (las fotos van sueltas en cada prueba),
@@ -319,25 +320,36 @@ def armar_archivos(carpeta: str, orden: str, origen: dict, datos: dict, limite: 
         agregar({"nombre": os.path.basename(liviana), "tipo": "image/jpeg", "prueba": pid}, liviana)
 
     pdf = os.path.join(salida, f"reporte-{orden}.pdf")
-    try:
-        pdf_simple.checklist_pdf(datos, pdf)
-    except Exception as exc:  # noqa: BLE001
-        notas.append(f"reporte PDF: {type(exc).__name__}: {exc}")
-    agregar({"nombre": os.path.basename(pdf), "tipo": "application/pdf", "reporte": True}, pdf)
+    # el mismo reporte (mismos resultados) no se sube dos veces: se compara su contenido sin la fecha
+    import hashlib
+    contenido = json.dumps({k: v for k, v in datos.items() if k not in ("fecha", "adjuntos")}, sort_keys=True,
+                           ensure_ascii=False, default=str)
+    clave_rep = "reporte:" + hashlib.sha256(contenido.encode("utf-8")).hexdigest()
+    if extra is not None:
+        extra["clave_reporte"] = clave_rep
+    if clave_rep in ya:
+        notas.append("reporte PDF: igual al que ya está en la página, no se vuelve a subir")
+    else:
+        try:
+            pdf_simple.checklist_pdf(datos, pdf)
+        except Exception as exc:  # noqa: BLE001
+            notas.append(f"reporte PDF: {type(exc).__name__}: {exc}")
+        agregar({"nombre": os.path.basename(pdf), "tipo": "application/pdf", "reporte": True}, pdf)
 
     for pid, paso in origen.items():
         if paso.get("estado") == "FALLA":
             for k, rel in enumerate(paso.get("fotos", []), 1):
                 foto(pid, rel, k, True)
 
-    for pid, nombre_html, nombre_pdf, titulo in (
-            ("p12", f"{orden}_BATERIA.html", "informe-bateria.pdf", "Informe de batería (powercfg)"),
-            ("p17", f"{orden}_AIDA.html", "informe-aida64.pdf", "Informe AIDA64")):
+    from reporte import informe
+    for pid, sufijo, nombre_pdf, titulo in (
+            ("p12", "BATERIA", "informe-bateria.pdf", "Informe de batería (powercfg)"),
+            ("p17", "AIDA", "informe-aida64.pdf", "Informe AIDA64")):
         if pid not in origen:
             continue
-        html = os.path.join(carpeta, nombre_html)
-        if not os.path.isfile(html):
-            notas.append(f"{nombre_pdf}: no existe {nombre_html}")
+        html = informe(carpeta, orden, sufijo)
+        if not html:
+            notas.append(f"{nombre_pdf}: no está el informe {orden}_{sufijo}")
             continue
         destino = os.path.join(salida, nombre_pdf)
         try:
@@ -446,7 +458,12 @@ def _anotar_subidos(carpeta: str, envio: dict, rechazados: dict) -> None:
         todo = {}
     lista = set(todo.get(envio["tipo"], []))
     for i, ruta in enumerate(envio.get("rutas", [])):
-        if str(i) not in rechazados and not envio["archivos"][i].get("reporte") and os.path.isfile(ruta):
+        if str(i) in rechazados:
+            continue
+        if envio["archivos"][i].get("reporte"):
+            if envio.get("clave_reporte"):
+                lista.add(envio["clave_reporte"])
+        elif os.path.isfile(ruta):
             lista.add(huella(ruta))
     todo[envio["tipo"]] = sorted(lista)
     with open(ruta_subidos(carpeta), "w", encoding="utf-8") as fh:
