@@ -1,8 +1,23 @@
-# PRUEBAS v22 — recorrido de diagnóstico con evidencia automática
+# PRUEBAS v22.5 — recorrido de diagnóstico con evidencia automática
 
 `PRUEBAS.exe` guía al técnico por todas las pruebas de un equipo, **detecta sola** todo lo que se puede detectar
 y **toma una foto de la pantalla** como evidencia de cada prueba. Al terminar deja el checklist en HTML con las
-fotos, el informe de batería y el de AIDA64, todo en `Informes\<orden>\`.
+fotos, el informe de batería y el de AIDA64, todo en `Informes\<orden>\`, y si está conectado a la página de órdenes
+de servicio envía solos los resultados, el reporte PDF y las fotos a la orden.
+
+## Descargar el programa listo para usar
+
+La carpeta completa (`PRUEBAS.exe` + herramientas portables de `ProgramData`) está en Google Drive:
+**https://drive.google.com/drive/folders/1fejlqjQvjjj25r3wRuCCRbNJX2Ad-c74**
+
+- Para una memoria USB: baja `ACTUALIZAR_USB.bat`, conecta la memoria y dale doble clic. Copia o actualiza solo lo
+  que falta o cambió.
+- Dentro de la carpeta del programa: `ACTUALIZAR.bat` la deja al día.
+
+Este repositorio tiene **solo el código** (`src\`) y los scripts. Los programas de terceros (AIDA64, HWMonitor,
+HD Tune, Hard Disk Sentinel, CrystalDiskInfo…) no se suben aquí: van en la carpeta de Drive.
+
+> Las versiones anteriores eran un menú `.BAT` (PRUEBAS v10 a v21). `PRUEBAS v21.BAT` queda como referencia.
 
 ## Estructura
 
